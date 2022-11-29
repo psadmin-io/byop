@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup #, find_packages
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -19,18 +19,18 @@ setup_args = dict(
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.6",
     ],
-    packages=find_packages(),
+    # packages=find_packages(''),
     keywords=['PeopleSoft', 'PeopleTools', 'CPU', 'Security Patches', 'Infrastructure DPK', 'IDPK'],    
     include_package_data=True,
-    install_requires=["docopt>=0.6.2","requests"],
+    install_requires=["click","requests","pyyaml"],
     entry_points={
         "console_scripts": [
-            "byop=byop.__main__:main",
+            "byop=byop:cli",
         ]
-    },
+    }
 )
 
 if __name__ == '__main__':
-    setup(**setup_args) 
+    setup(**setup_args)

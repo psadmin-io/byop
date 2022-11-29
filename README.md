@@ -3,5 +3,6 @@
 ## Installation
 
 ```bash
-pip install docopt==0.6.2
+python3 -m pip install click
+python3 -m pip install py
 ```

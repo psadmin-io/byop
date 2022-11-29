@@ -1,3 +1,7 @@
-byop.yaml
-psft_patches.yaml
-logs/*
+*.yaml
+*.json
+*.log
+
+# Python files
+*.egg-info/*
+vent/*
