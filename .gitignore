@@ -1,7 +1,12 @@
 *.yaml
 *.json
 *.log
+tmp/*
+cpu_archives/*
+*.links
 
 # Python files
 *.egg-info/*
-vent/*
+venv/*
+dist/*
+__pycache__/*

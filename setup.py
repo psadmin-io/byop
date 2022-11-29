@@ -7,7 +7,7 @@ HISTORY = (HERE / "HISTORY.md").read_text()
 
 setup_args = dict(
     name='byop',
-    version='0.0.1',
+    version='0.1.0',
     description='psadmin.io - Bring Your Own Patches IDPK Builder',
     long_description_content_type="text/markdown",
     long_description=README + '\n\n' + HISTORY,
@@ -22,8 +22,9 @@ setup_args = dict(
         "Programming Language :: Python :: 3.6",
     ],
     # packages=find_packages(''),
-    keywords=['PeopleSoft', 'PeopleTools', 'CPU', 'Security Patches', 'Infrastructure DPK', 'IDPK'],    
+    keywords=['PeopleSoft', 'PeopleTools', 'CPU', 'Security Patches', 'Infrastructure DPK', 'IDPK'],
     include_package_data=True,
+    py_modules=['byop'],
     install_requires=["click","requests","pyyaml"],
     entry_points={
         "console_scripts": [
