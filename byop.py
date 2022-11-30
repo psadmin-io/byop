@@ -34,6 +34,8 @@ class Config(dict):
 pass_config = click.make_pass_decorator(Config, ensure=True)
 this = sys.modules[__name__]
 this.config = None
+this.timings = None
+patch_yml = {}
 
 WEBLOGIC = "weblogic_patches"
 WEBLOGIC_VERSION = "weblogic_patches_version"
@@ -48,18 +50,18 @@ def cli(config):
     this.config = config
 
     # Timings setup 
-    # this = sys.modules[__name__]
-    # this.timings = None
-    # this.total_time_key = 'TOTAL TIME'
-    # this.timings_printed = False
+    this.total_time_key = 'TOTAL TIME'
+    this.timings_printed = False
     pass  
 
 @pass_config
 def init(config):
     if not config.get('archive_dir'):
-        this.config['archive_dir'] = os.getcwd() + '/cpu_archives'
+        this.config['archive_dir'] = os.path.join(os.getcwd(), 'cpu_archives')
     if not config.get('tmp_dir'):
-        this.config['tmp_dir'] = os.getcwd() + '/tmp'
+        this.config['tmp_dir'] = os.path.join(os.getcwd(), 'tmp')
+    if not config.get('patch_status_file'):
+        this.config['patch_status_file'] = os.path.join(this.config['tmp_dir'], 'patch_status_file')
 
     setup_logging()
 
@@ -89,15 +91,22 @@ def directories(config):
               default=False, 
               is_flag=True, 
               help="Enable debug logging")
+@click.option('--quiet', 
+              default=False, 
+              is_flag=True, 
+              help="Don't print timing output")
 @pass_config
-def build(config, src_yaml, tgt_yaml, verbose):
+def build(config, src_yaml, tgt_yaml, verbose, quiet):
 
     if not config.get('verbose'):
         this.config['verbose'] = verbose
+    if not config.get('quiet'):
+        this.config['quiet'] = quiet
     if not config.get('download_threads'):
         this.config['download_threads'] = 2
 
     init()
+    init_timings()
 
     logging.debug("Source YAML: " + src_yaml)
     logging.debug("Target YAML: " + tgt_yaml)
@@ -111,10 +120,9 @@ def build(config, src_yaml, tgt_yaml, verbose):
         if yml['platform']:
             platform = yml['platform']
         if yml[WEBLOGIC_VERSION]:
-            for patch in yml[WEBLOGIC_VERSION]:
-                get_weblogic_patches(patch, platform)
-        if yml[WEBLOGIC_VERSION]:
+            get_weblogic_patches(yml, platform)
 
+    print_timings()
     pass
 
 # ################# #
@@ -136,24 +144,42 @@ def build_directories():
     except OSError as error:
         logging.error("Directory '%s' can not be created" % os.path.join(this.config['tmp_dir']))
 
-    logging.info("Directories created")
+def get_weblogic_patches(yml, platform):
+    timing_key = "weblogic patches"
+    start_timing(timing_key)
+    
+    weblogic_patches = {}
+    weblogic_patches_version = {}
+    i = 0
+    for patch in yml[WEBLOGIC_VERSION]:
+        logging.info("Downloading WebLogic Patch: " + str(patch))
+        file_name = get_patch(patch, platform, WEBLOGIC)
+        weblogic_patches_version["patch" + str(i)] = "patch"
 
-def get_weblogic_patches(patch, platform):
-    # timing_key = "dpk deploy"
-    # start_timing(timing_key)
+    logging.debug("weblogic_patches_version: ")
+    logging.debug(yaml.dump(weblogic_patches_version))
 
-    logging.info("Downloading patch: " + str(patch))
-    __get_dpk_mos(patch, platform, WEBLOGIC)
+    # Add Weblogic Patches to psft_patches.yaml
+    # patch_yml = 
+    
+    end_timing(timing_key)
 
+def get_patch(patch, platform, product):
+    timing_key = "__get_patch"
+    if not __get_patch_status(patch, timing_key):
+        logging.debug("Patch not downloaded")
+        __get_mos_patch(patch, platform, product)
+    else:
+        logging.info("Patch already downloaded: " + str(patch))
 
 # Copied from ioco - thanks Kyle!
-def __get_dpk_mos(patch_id, platform_id, product):
+def __get_mos_patch(patch, platform, product):
     logging.info(" - Downloading files from MOS")
-    timing_key = "dpk deploy __get_dpk_mos"
-    # util.start_timing(timing_key)
+    timing_key = "__get_mos_patch"
+    start_timing(timing_key)
     
     logging.debug("Creating auth cookie from MOS")
-    cookie_file = 'mos.cookie'
+    cookie_file = os.path.join(this.config['tmp_dir'], 'mos.cookie')
 
     # eat any old cookies
     if os.path.exists(cookie_file):
@@ -170,7 +196,7 @@ def __get_dpk_mos(patch_id, platform_id, product):
         login_url = r.headers['Location']
         if not login_url:
             logging.error("Location was empty so login URL can't be set") 
-            # util.error_timings(timing_key)
+            error_timings(timing_key)
             exit(2)
 
         # Create a NEW session, then send Basic Auth to login redirect URL
@@ -187,17 +213,17 @@ def __get_dpk_mos(patch_id, platform_id, product):
             logging.debug("MOS login was successful")
         else:
             logging.error("MOS login was NOT successful.")
-            # util.error_timings(timing_key)
+            error_timings(timing_key)
             exit(2)
     except:
         logging.error("Issue getting MOS auth token")
-        # util.end_timing(timing_key)
+        end_timing(timing_key)
         raise
 
     try:
         # Use same session to search for downloads
         logging.debug('Search for list of downloads, using same session')
-        mos_uri_search = "https://updates.oracle.com/Orion/SimpleSearch/process_form?search_type=patch&patch_number=" + str(patch_id) + "&" + str(platform_id)
+        mos_uri_search = "https://updates.oracle.com/Orion/SimpleSearch/process_form?search_type=patch&patch_number=" + str(patch) + "&" + str(platform)
         r = s.get(mos_uri_search) 
         search_results = r.content.decode('utf-8')
         
@@ -206,18 +232,18 @@ def __get_dpk_mos(patch_id, platform_id, product):
             logging.debug("Search results return success")
         else:
             logging.error("Search results did NOT return success")
-            # util.error_timings(timing_key)
+            error_timings(timing_key)
             exit(2)
     except:
         logging.error("Issue getting MOS search results")
-        # util.end_timing(timing_key)
+        end_timing(timing_key)
         raise
         
     try:        
         # Extract download links to list
         pattern = "https://.+?Download/process_form/[^\"]*.zip[^\"]*"
         download_links = re.findall(pattern,search_results)
-        download_links_file = 'mos-download.links'
+        download_links_file = os.path.join(this.config['tmp_dir'], 'mos-download.links')
         # Write download links to file
         f = open(download_links_file,"w")
         for link in download_links:
@@ -231,11 +257,11 @@ def __get_dpk_mos(patch_id, platform_id, product):
             logging.info(" - Downloading " + str(len(download_links)) + " files")
         else:
             logging.error("No download links found")
-            # util.error_timings(timing_key)
+            error_timings(timing_key)
             exit(2)
     except:
         logging.error("Issue creating download links file")
-        # util.end_timing(timing_key)
+        end_timing(timing_key)
         raise
 
     # multi thread download
@@ -245,10 +271,12 @@ def __get_dpk_mos(patch_id, platform_id, product):
         logging.info("    Moving to patch to " + str(target_dir))
         shutil.move(os.path.join(this.config['tmp_dir'], r), target_dir)
         logging.info("    [DONE] " + r)
-
+        update_patch_status(patch, True)
+        logging.debug("Update Patch Status - " + str(patch) + ": true")
     
-    logging.debug("Update DPK status - downloaded_patch_files: true")
-    # util.end_timing(timing_key)
+
+    end_timing(timing_key)
+    return r # The last filename
 
 def __download_file(url):
     # assumes that the last segment after the / represents the file name
@@ -264,6 +292,46 @@ def __download_file(url):
                 f.write(data)
 
     return file_name
+
+def __get_patch_status(patch, timing_key):
+    # Checking Patch download status
+    if not os.path.exists(this.config.get('patch_status_file')):
+        logging.debug("Patch Status File missing - creating it now")
+        try:
+            with open(this.config.get('patch_status_file'),'w') as f:
+                patch_status = {}
+                json.dump(patch_status, f)
+        except FileNotFoundError:
+            logging.error("Patch files directory not created. Try again with `byop directories`")
+            error_timings(timing_key)
+            exit(2)
+        except:
+            logging.error("Issue creating Patch status file")
+            raise
+    else:
+        try:
+            with open(this.config.get('patch_status_file')) as f:
+                patch_status = json.load(f)
+        except:
+            logging.error("Issue opening Patch status file")
+
+    logging.debug("Patch status: \n" + json.dumps(patch_status))
+    try:
+        if patch_status[str(patch)]:
+            return True
+    except:
+        return False
+
+def update_patch_status(step, status):
+    try:
+        with open(this.config.get('patch_status_file'), 'r+') as f:
+            patch_status = json.load(f)
+            patch_status[step] = status
+            f.seek(0)
+            f.truncate()
+            json.dump(patch_status, f)
+    except:
+        logging.error('Issue updating patch status json file')
 
 def setup_logging():
 
@@ -308,7 +376,7 @@ def error_timings(name):
 
 def print_timings():
 
-    if not this.timings_printed and not this.config['--quiet']:
+    if not this.timings_printed and not this.config['quiet']:
 
         # if total time has been calculated by a previous call, skip
         if not isinstance(this.timings[this.total_time_key], datetime.timedelta): 
@@ -340,7 +408,3 @@ def print_timings():
         print(header)
 
         this.timings_printed = True
-
-# if __name__ == '__main__':
-#     cli()
-
