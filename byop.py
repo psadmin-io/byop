@@ -52,10 +52,7 @@ def cli(config):
     # Timings setup 
     this.total_time_key = 'TOTAL TIME'
     this.timings_printed = False
-    pass  
 
-@pass_config
-def init(config):
     if not config.get('archive_dir'):
         this.config['archive_dir'] = os.path.join(os.getcwd(), 'cpu_archives')
     if not config.get('tmp_dir'):
@@ -63,17 +60,7 @@ def init(config):
     if not config.get('patch_status_file'):
         this.config['patch_status_file'] = os.path.join(this.config['tmp_dir'], 'patch_status_file')
 
-    setup_logging()
-
-# ########### #
-# directories #
-# ########### #
-@cli.command()
-@pass_config
-def directories(config):
-    init()
-    build_directories()
-    pass
+    pass  
 
 # ##### #
 # build #
@@ -105,12 +92,14 @@ def build(config, src_yaml, tgt_yaml, verbose, quiet):
     if not config.get('download_threads'):
         this.config['download_threads'] = 2
 
-    init()
-    init_timings()
-
-    logging.debug("Source YAML: " + src_yaml)
-    logging.debug("Target YAML: " + tgt_yaml)
+    this.config['src_yaml'] = src_yaml
+    this.config['tgt_yaml'] = tgt_yaml
+    logging.debug("Source YAML: " + this.config['tgt_yaml'])
+    logging.debug("Target YAML: " + this.config['tgt_yaml'])
     logging.debug(this.config['mos_username'])
+
+    setup_logging()
+    init_timings()
 
     with open(src_yaml, 'r') as f:
         yml = yaml.load(f, Loader=yaml.FullLoader)
@@ -150,17 +139,23 @@ def get_weblogic_patches(yml, platform):
     
     weblogic_patches = {}
     weblogic_patches_version = {}
-    i = 0
-    for patch in yml[WEBLOGIC_VERSION]:
-        logging.info("Downloading WebLogic Patch: " + str(patch))
+
+    logging.info("Downloading " + str(len(yml[WEBLOGIC_VERSION])) + " patches for Weblogic")
+
+    for i, patch in enumerate(yml[WEBLOGIC_VERSION], start=1):
+        logging.info(" - Downloading WebLogic Patch: " + str(patch))
         file_name = get_patch(patch, platform, WEBLOGIC)
-        weblogic_patches_version["patch" + str(i)] = "patch"
+        if file_name:
+            weblogic_patches_version["patch" + str(i)] = str(patch)
+            weblogic_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/weblogic_patches/' + file_name
 
     logging.debug("weblogic_patches_version: ")
     logging.debug(yaml.dump(weblogic_patches_version))
+    __write_to_yaml(weblogic_patches_version, WEBLOGIC_VERSION)
 
-    # Add Weblogic Patches to psft_patches.yaml
-    # patch_yml = 
+    logging.debug("weblogic_patches: ")
+    logging.debug(yaml.dump(weblogic_patches))
+
     
     end_timing(timing_key)
 
@@ -168,9 +163,11 @@ def get_patch(patch, platform, product):
     timing_key = "__get_patch"
     if not __get_patch_status(patch, timing_key):
         logging.debug("Patch not downloaded")
-        __get_mos_patch(patch, platform, product)
+        file_name = __get_mos_patch(patch, platform, product)
+        return file_name
     else:
         logging.info("Patch already downloaded: " + str(patch))
+        return False
 
 # Copied from ioco - thanks Kyle!
 def __get_mos_patch(patch, platform, product):
@@ -269,9 +266,12 @@ def __get_mos_patch(patch, platform, product):
     for r in results:
         target_dir = os.path.join(this.config['archive_dir'], product, r)
         logging.info("    Moving to patch to " + str(target_dir))
-        shutil.move(os.path.join(this.config['tmp_dir'], r), target_dir)
+        try:
+            shutil.move(os.path.join(this.config['tmp_dir'], r), target_dir)
+        except:
+            logging.error("Encountered an error moving the patch to the cpu_archives folder")
         logging.info("    [DONE] " + r)
-        update_patch_status(patch, True)
+        __update_patch_status(patch, True)
         logging.debug("Update Patch Status - " + str(patch) + ": true")
     
 
@@ -322,7 +322,7 @@ def __get_patch_status(patch, timing_key):
     except:
         return False
 
-def update_patch_status(step, status):
+def __update_patch_status(step, status):
     try:
         with open(this.config.get('patch_status_file'), 'r+') as f:
             patch_status = json.load(f)
@@ -332,6 +332,15 @@ def update_patch_status(step, status):
             json.dump(patch_status, f)
     except:
         logging.error('Issue updating patch status json file')
+
+def __write_to_yaml(dict, key):
+
+    with open(this.config.get('tgt_yaml')) as tgt_yaml:
+        tgt = yaml.load(tgt_yaml, Loader=yaml.FullLoader)
+        for i in tgt[key]:
+            click.echo(i,dict[key][i])
+            dict[key].update({i:dict[key][i]})
+        click.echo(dict)
 
 def setup_logging():
 
