@@ -37,8 +37,16 @@ this.config = None
 this.timings = None
 patch_yml = {}
 
-WEBLOGIC = "weblogic_patches"
-WEBLOGIC_VERSION = "weblogic_patches_version"
+JDK_PATCHES = "jdk_patches"
+JDK_PATCHES_VERSION = "jdk_patches_version"
+ORACLECLIENT_OPATCH_PATCHES = "oracleclient_opatch_patches"
+ORACLECLIENT_PATCHES = "oracleclient_patches"
+ORACLECLIENT_PATCHES_VERSION = "oracleclient_patches_version"
+TUXEDO_PATCHES = "tuxedo_patches"
+TUXEDO_PATCHES_VERSION = "tuxedo_patches_version"
+WEBLOGIC_OPATCH_PATCHES = "weblogic_opatch_patches"
+WEBLOGIC_PATCHES = "weblogic_patches"
+WEBLOGIC_PATCHES_VERSION = "weblogic_patches_version"
 
 @click.group(no_args_is_help=True)
 @pass_config
@@ -61,6 +69,17 @@ def cli(config):
         this.config['patch_status_file'] = os.path.join(this.config['tmp_dir'], 'patch_status_file')
 
     pass  
+
+@cli.command()
+@click.option('-u', '--mos-username',
+              help='My Oracle Support Username',
+              prompt=True)
+@click.option('-p', '--mos-password',
+              help='My Oracle Support Password',
+              prompt=True, hide_input=True, confirmation_prompt=True)
+@pass_config
+def config(config, mos_username, mos_password):
+    click.echo("MOS User: " + mos_username + " : " + mos_password)
 
 # ##### #
 # build #
@@ -108,7 +127,7 @@ def build(config, src_yaml, tgt_yaml, verbose, quiet):
         build_directories()
         if yml['platform']:
             platform = yml['platform']
-        if yml[WEBLOGIC_VERSION]:
+        if yml[WEBLOGIC_PATCHES_VERSION]:
             get_weblogic_patches(yml, platform)
 
     print_timings()
@@ -124,9 +143,9 @@ def build_directories():
         logging.error("Directory '%s' can not be created" % this.config['archive_dir'])
     
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], WEBLOGIC), exist_ok = True)
+        os.makedirs(os.path.join(this.config['archive_dir'], WEBLOGIC_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], WEBLOGIC))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], WEBLOGIC_PATCHES))
     
     try:
         os.makedirs(os.path.join(this.config['tmp_dir']), exist_ok = True)
@@ -140,18 +159,18 @@ def get_weblogic_patches(yml, platform):
     weblogic_patches = {}
     weblogic_patches_version = {}
 
-    logging.info("Downloading " + str(len(yml[WEBLOGIC_VERSION])) + " patches for Weblogic")
+    logging.info("Downloading " + str(len(yml[WEBLOGIC_PATCHES_VERSION])) + " patches for Weblogic")
 
-    for i, patch in enumerate(yml[WEBLOGIC_VERSION], start=1):
+    for i, patch in enumerate(yml[WEBLOGIC_PATCHES_VERSION], start=1):
         logging.info(" - Downloading WebLogic Patch: " + str(patch))
-        file_name = get_patch(patch, platform, WEBLOGIC)
+        file_name = get_patch(patch, platform, WEBLOGIC_PATCHES)
         if file_name:
             weblogic_patches_version["patch" + str(i)] = str(patch)
             weblogic_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/weblogic_patches/' + file_name
 
     logging.debug("weblogic_patches_version: ")
     logging.debug(yaml.dump(weblogic_patches_version))
-    __write_to_yaml(weblogic_patches_version, WEBLOGIC_VERSION)
+    __write_to_yaml(weblogic_patches_version, WEBLOGIC_PATCHES_VERSION)
 
     logging.debug("weblogic_patches: ")
     logging.debug(yaml.dump(weblogic_patches))

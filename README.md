@@ -4,12 +4,32 @@
 
 This tool is not intended to replace the Oracle-delivered Infra-DPK. The intent is to make it easier to apply CPU patches to PeopleSoft systems easier by leveraging the DPK toolset. The Infra-DPK package can sometimes take a few weeks to be available, but most of the individual patches are available right way. `byop` can let you download the patches that are avaiable and apply them to your system quickly.
 
-
 # Installing
 ```
 cd byop
-pip install .
+python3 -m pip install .
 ```
+
+# Building an Infra-DPK Package
+
+```bash
+byop config
+byop build
+```
+
+`byop` will take an input YAML file (`byop.yaml` is the default) and will download the patches listed in the file, and create a `psft_patches.yaml` file.
+
+You can use different YAML file names if you want to version each release.
+
+```bash
+byop build --src-yaml 22q4.yaml --tgt-yaml psft_patces_22q4.yaml
+```
+
+There is a debug output mode that is enabled with the `--verbose` flag.
+
+
+
+
 
 # Setting up for development
 ```
