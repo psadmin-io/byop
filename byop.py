@@ -29,7 +29,7 @@ class Config(dict):
     def save(self):
         self.config.ensure()
         with self.config.open('w') as f:
-            f.write(json.dumps(self))
+            f.write(json.dumps(self, indent=2))
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
 this = sys.modules[__name__]
@@ -79,7 +79,12 @@ def cli(config):
               prompt=True, hide_input=True, confirmation_prompt=True)
 @pass_config
 def config(config, mos_username, mos_password):
-    click.echo("MOS User: " + mos_username + " : " + mos_password)
+    setup_logging()
+
+    config["mos_username"] = mos_username
+    config["mos_password"] = mos_password
+    config.save()
+    logging.info("Configuration save to config.json")
 
 # ##### #
 # build #
