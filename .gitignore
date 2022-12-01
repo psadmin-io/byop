@@ -1,9 +1,10 @@
 *.yaml
 *.json
 *.log
+!codes/codes.yaml
 tmp/*
 cpu_archives/*
-*.links
+
 
 # Python files
 *.egg-info/*

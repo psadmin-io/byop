@@ -1,0 +1,21 @@
+platform:
+  linux: '226P'
+  windows: '233P'
+peopletools: 
+  860:
+    weblogic: '141100' # '600000000123696'
+    oracleclient:
+    jdk:
+    tuxedo:
+  859:
+    weblogic: '141100' # '600000000123696'
+    oracleclient:
+    jdk:
+    tuxedo:
+  858:
+    weblogic: '122140' # '600000000123696'
+    oracleclient:
+    jdk:
+    tuxedo:
+# products:
+#   weblogic: 15991
