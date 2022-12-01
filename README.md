@@ -5,7 +5,10 @@
 This tool is not intended to replace the Oracle-delivered Infra-DPK. The intent is to make it easier to apply CPU patches to PeopleSoft systems easier by leveraging the DPK toolset. The Infra-DPK package can sometimes take a few weeks to be available, but most of the individual patches are available right way. `byop` can let you download the patches that are avaiable and apply them to your system quickly.
 
 # Installing
+
+## Git
 ```
+git clone https://github.com/psadmin-io/byop.git
 cd byop
 python3 -m pip install .
 ```
@@ -13,7 +16,12 @@ python3 -m pip install .
 # Building an Infra-DPK Package
 
 ```bash
-byop config
+$ byop config
+
+Mos username: dan@psadmin.io
+Mos password: 
+[INFO ]  Configuration save to config.json
+
 byop build
 ```
 
