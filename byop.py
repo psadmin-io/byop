@@ -189,9 +189,11 @@ def cleanup(config, yaml, tgt_yaml, verbose, quiet):
 def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     """Download and create an Infra-DPK package"""
 
-    this.config['redownload'] = redownload
     this.config['verbose'] = verbose
     this.config['quiet'] = quiet
+    setup_logging()
+    
+    this.config['redownload'] = redownload
     if not config.get('download_threads'):
         this.config['download_threads'] = 2
     this.config['src_yaml'] = src_yaml
@@ -200,7 +202,6 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     logging.debug("Target YAML: " + this.config['tgt_yaml'])
     logging.debug(this.config['mos_username'])
 
-    setup_logging()
     init_timings()
     build_directories()
     download_patches()
