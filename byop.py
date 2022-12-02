@@ -69,14 +69,21 @@ this.timings = None
 this.codes = {}
 
 # Constants
+PEOPLETOOLS = "peopletools"
+JDK = "jdk"
 JDK_PATCHES = "jdk_patches"
 JDK_PATCHES_VERSION = "jdk_patches_version"
+ORACLECLIENT_OPATCH = "oracleclient_opatch"
 ORACLECLIENT_OPATCH_PATCHES = "oracleclient_opatch_patches"
+ORACLECLIENT = "oracleclient"
 ORACLECLIENT_PATCHES = "oracleclient_patches"
 ORACLECLIENT_PATCHES_VERSION = "oracleclient_patches_version"
+TUXEDO = "tuxedo"
 TUXEDO_PATCHES = "tuxedo_patches"
 TUXEDO_PATCHES_VERSION = "tuxedo_patches_version"
+WEBLOGIC_OPATCH = "weblogic_opatch"
 WEBLOGIC_OPATCH_PATCHES = "weblogic_opatch_patches"
+WEBLOGIC = "weblogic"
 WEBLOGIC_PATCHES = "weblogic_patches"
 WEBLOGIC_PATCHES_VERSION = "weblogic_patches_version"
 
@@ -255,39 +262,45 @@ def download_patches():
         yml = yaml.load(f, Loader=yaml.FullLoader)
         logging.debug(json.dumps(yml, indent=2))
 
+    # Validate input file has required sections
     try:
-        platform = this.codes['platform'][yml['platform']]
-        logging.debug("Platform - " + yml['platform'] + ": " + platform)
-    except NameError:
-        logging.error("Input YAML file must specify platform")
-        raise
+        platform_name = yml.get('platform')
+        if platform_name:
+            platform = this.codes['platform'][yml['platform']]
+            logging.debug("Platform - " + yml['platform'] + ": " + platform)
+        else:
+            logging.error("Input YAML file must specify 'platform: <value>'")
+        ptversion = yml.get(PEOPLETOOLS)
+        if ptversion:
+            logging.debug("Download patches for PeopleTools " + ptversion)
+        else:
+            logging.error("Input YAML file must specify 'peopletools: <value>'")
+    except:
+        exit(2)
 
-    try:
-        ptversion = yml['peopletools']
-        logging.debug("Download patches for PeopleTools " + ptversion)
-    except NameError:
-        logging.error("Input YAML file must specify PeopleTools")
-        raise
+    # Get MOS Session for downloads
+    session = get_mos_authentication()
+    
+    # Download patches
+    if yml.get(WEBLOGIC):
+        release = this.codes[PEOPLETOOLS][str(ptversion)][WEBLOGIC]
+        get_weblogic_patches(session, yml, WEBLOGIC, platform, release)
+    else:
+        logging.info("No Weblogic Patches")
 
-    try:
-        if yml[WEBLOGIC_PATCHES_VERSION]:
-            logging.info(this.codes['peopletools'])
-            release = this.codes['peopletools'][str(ptversion)]['weblogic']
-            logging.debug("PeopleTools - " + yml['peopletools'] + ": " + release)
-            get_weblogic_patches(yml, WEBLOGIC_PATCHES_VERSION, platform, release)
-    except NameError:
-        logging.info("No Weblogic Patches: " + NameError)
-
-    try:
-        if yml[WEBLOGIC_OPATCH_PATCHES]:
-            
-            release = this.codes['peopletools'][yml['peopletools']]['weblogic_opatch']
-            logging.debug("PeopleTools - " + yml['peopletools'] + ": " + release)
-            get_weblogic_opatch_patches(yml, WEBLOGIC_OPATCH_PATCHES, platform, release)
-    except NameError:
+    if yml.get(WEBLOGIC_OPATCH):
+        release = this.codes[PEOPLETOOLS][str(ptversion)][WEBLOGIC_OPATCH]
+        get_weblogic_opatch_patches(session, yml, WEBLOGIC_OPATCH, platform, release)
+    else:
         logging.info("No Weblogic OPatch Patches")
 
-def get_weblogic_patches(yml, section, platform, release):
+    if yml.get(TUXEDO):
+        release = this.codes[PEOPLETOOLS][str(ptversion)][TUXEDO]
+        get_tuxedo_patches(session, yml, TUXEDO, platform, release)
+    else:
+        logging.info("No Tuxedo Patches")
+
+def get_weblogic_patches(session, yml, section, platform, release):
     timing_key = "weblogic patches"
     start_timing(timing_key)
     
@@ -298,25 +311,25 @@ def get_weblogic_patches(yml, section, platform, release):
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
         logging.info(" - Downloading WebLogic Patch: " + str(patch))
-        file_name = get_patch(patch, platform, release, section)
+        file_name = get_patch(session, patch, platform, release, WEBLOGIC_PATCHES)
         if file_name:
             downloaded = True
             weblogic_patches_version["patch" + str(i)] = str(patch)
-            weblogic_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + section + '/' + file_name
+            weblogic_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + WEBLOGIC_PATCHES + '/' + file_name
 
     if downloaded:
-        logging.debug("weblogic_patches_version: ")
+        logging.debug(WEBLOGIC_PATCHES_VERSION + ": ")
         logging.debug(yaml.dump(weblogic_patches_version))
-        __write_to_yaml(weblogic_patches_version, section)
+        __write_to_yaml(weblogic_patches_version, WEBLOGIC_PATCHES_VERSION)
 
-        logging.debug("weblogic_patches: ")
+        logging.debug(WEBLOGIC_PATCHES + ": ")
         logging.debug(yaml.dump(weblogic_patches))
         __write_to_yaml(weblogic_patches, WEBLOGIC_PATCHES)
 
     
     end_timing(timing_key)
 
-def get_weblogic_opatch_patches(yml, section, platform, release):
+def get_weblogic_opatch_patches(session, yml, section, platform, release):
     timing_key = "weblogic opatch patches"
     start_timing(timing_key)
     
@@ -326,33 +339,50 @@ def get_weblogic_opatch_patches(yml, section, platform, release):
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
         logging.info(" - Downloading Patch: " + str(patch))
-        file_name = get_patch(patch, platform, release, section)
+        file_name = get_patch(session, patch, platform, release, section)
         if file_name:
             downloaded = True
-            # weblogic_patches_version["patch" + str(i)] = str(patch)
-            patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + section + '/' + file_name
+            patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + WEBLOGIC_OPATCH_PATCHES + '/' + file_name
 
     if downloaded:
-        logging.debug(section + ": ")
+        logging.debug(WEBLOGIC_OPATCH_PATCHES + ": ")
         logging.debug(yaml.dump(patches))
-        __write_to_yaml(patches, section)
+        __write_to_yaml(patches, WEBLOGIC_OPATCH_PATCHES)
 
     end_timing(timing_key)
 
-def get_patch(patch, platform, release, product):
-    timing_key = "__get_patch"
-    if not __get_patch_status(patch, timing_key):
-        logging.debug("Patch not downloaded")
-        file_name = __get_mos_patch(patch, platform, release, product)
-        return file_name
-    else:
-        logging.info("Patch already downloaded: " + str(patch))
-        return False
+def get_tuxedo_patches(session, yml, section, platform, release):
+    timing_key = "tuxedo patches"
+    start_timing(timing_key)
+    
+    tuxedo_patches = {}
+    tuxedo_patches_version = {}
 
-def __get_mos_patch(patch, platform, release, product):
+    logging.info("Downloading " + str(len(yml[section])) + " patches for Tuxedo")
+    downloaded = False
+    for i, patch in enumerate(yml[section], start=1):
+        patch,version=patch.split(':', 1)
+        logging.info(" - Downloading Tuxedo Patch: " + str(patch))
+        file_name = get_patch(session, patch, platform, release, TUXEDO_PATCHES)
+        if file_name:
+            downloaded = True
+            tuxedo_patches_version["patch" + str(i)] = str(version)
+            tuxedo_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + TUXEDO_PATCHES_VERSION + '/' + file_name
+
+    if downloaded:
+        logging.debug(TUXEDO_PATCHES_VERSION + ": ")
+        logging.debug(yaml.dump(tuxedo_patches_version))
+        __write_to_yaml(tuxedo_patches_version, TUXEDO_PATCHES_VERSION)
+
+        logging.debug(TUXEDO_PATCHES + ": ")
+        logging.debug(yaml.dump(tuxedo_patches))
+        __write_to_yaml(tuxedo_patches, TUXEDO_PATCHES)
+
+    end_timing(timing_key)
+
+def get_mos_authentication():
     # Copied from ioco - thanks Kyle!
-    logging.info(" - Downloading files from MOS")
-    timing_key = "__get_mos_patch"
+    timing_key = "get_mos_authentication"
     start_timing(timing_key)
     
     logging.debug("Creating auth cookie from MOS")
@@ -387,7 +417,7 @@ def __get_mos_patch(patch, platform, release, product):
 
         # Validate login was success                 
         if r.ok:
-            logging.debug("MOS login was successful")
+            logging.info("MOS Login was Successful")
         else:
             logging.error("MOS login was NOT successful.")
             error_timings(timing_key)
@@ -395,13 +425,30 @@ def __get_mos_patch(patch, platform, release, product):
     except:
         logging.error("Issue getting MOS auth token")
         end_timing(timing_key)
-        raise
+        exit(4)
 
+    end_timing(timing_key)
+    return s
+
+def get_patch(session, patch, platform, release, product):
+    # Copied from ioco - thanks Kyle!
+    if not __get_patch_status(patch):
+        logging.debug("Patch not downloaded")
+        file_name = __get_mos_patch(session, patch, platform, release, product)
+        return file_name
+    else:
+        logging.info("Patch already downloaded: " + str(patch))
+        return False
+
+def __get_mos_patch(session, patch, platform, release, product):
+    timing_key = "__get_mos_patch"
+    start_timing(timing_key)
+    logging.debug(" - Downloading files from MOS")
     try:
         # Use same session to search for downloads
         logging.debug('Search for list of downloads, using same session')
         mos_uri_search = "https://updates.oracle.com/Orion/SimpleSearch/process_form?search_type=patch&patch_number=" + str(patch) + "&plat_lang=" + str(platform)
-        r = s.get(mos_uri_search) 
+        r = session.get(mos_uri_search) 
         search_results = r.content.decode('utf-8')
         
         # Validate search results                 
@@ -410,7 +457,7 @@ def __get_mos_patch(patch, platform, release, product):
         else:
             logging.error("Search results did NOT return success")
             error_timings(timing_key)
-            exit(2)
+            exit(3)
     except:
         logging.error("Issue getting MOS search results")
         end_timing(timing_key)
@@ -435,7 +482,7 @@ def __get_mos_patch(patch, platform, release, product):
 
         # Validate download links
         if len(download_links) > 0:
-            logging.info(" - Downloading " + str(len(download_links)) + " files")
+            logging.debug(" - Downloading " + str(len(download_links)) + " files")
         else:
             logging.error("No download links found")
             error_timings(timing_key)
@@ -449,15 +496,21 @@ def __get_mos_patch(patch, platform, release, product):
     results = ThreadPool(this.config.get('download_threads')).imap_unordered(__download_file, download_links)
     for r in results:
         target_dir = os.path.join(this.config['archive_dir'], product, r)
-        logging.info("    Moving to patch to " + str(target_dir))
+        logging.debug("    Moving to patch to " + str(target_dir))
         try:
             shutil.move(os.path.join(this.config['tmp_dir'], r), target_dir)
+        except FileNotFoundError: 
+            logging.error("Patch file file not found")
+        except PermissionError: 
+            logging.error("You do not have permssion to copy to " + target_dir)
+        except NotADirectoryError:
+            logging.error("The target directory is incorrect: " + target_dir)
         except:
-            logging.error("Encountered an error moving the patch to the cpu_archives folder")
-        logging.info("    [DONE] " + r)
+            logging.error("Encountered an error moving the patch to the cpu_archives/ " + str(product) + " folder")
+        logging.debug("    - [DONE] " + r)
+
         __update_patch_status(patch, True)
         logging.debug("Update Patch Status - " + str(patch) + ": true")
-    
 
     end_timing(timing_key)
     return r # The last filename
@@ -477,7 +530,7 @@ def __download_file(url):
 
     return file_name
 
-def __get_patch_status(patch, timing_key):
+def __get_patch_status(patch):
     # Checking Patch download status
     if not this.config.get('redownload'):
         if not os.path.exists(this.config.get('patch_status_file')):
@@ -488,7 +541,6 @@ def __get_patch_status(patch, timing_key):
                     json.dump(patch_status, f)
             except FileNotFoundError:
                 logging.error("Patch files directory not created. Try again with `byop directories`")
-                error_timings(timing_key)
                 exit(2)
             except:
                 logging.error("Issue creating Patch status file")
@@ -517,14 +569,17 @@ def __update_patch_status(step, status):
             patch_status[step] = status
             f.seek(0)
             f.truncate()
-            json.dump(patch_status, f)
+            json.dump(patch_status, f, indent=2)
     except:
         logging.error('Issue updating patch status json file')
 
 def __write_to_yaml(dict, header):
 
-    with open(this.config.get('tgt_yaml'), 'r') as tgt_yaml:
-        tgt = yaml.load(tgt_yaml, Loader=yaml.FullLoader) or {}
+    if os.path.exists(this.config.get('tgt_yaml')):
+        with open(this.config.get('tgt_yaml'), 'r') as tgt_yaml:
+            tgt = yaml.load(tgt_yaml, Loader=yaml.FullLoader) or {}
+    else:
+        tgt = {}
 
     tgt.pop(header, None)
     tgt[header] = dict

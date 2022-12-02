@@ -3,20 +3,20 @@ platform:
   windows: '233P'
 peopletools: 
   '860':
-    weblogic: '141100' # '600000000123696'
+    weblogic: '141100'
+    weblogic_opatch: '1394210'
     oracleclient:
     jdk:
-    tuxedo:
+    tuxedo: '122200'
   '859':
-    weblogic: '141100' # '600000000123696'
+    weblogic: '141100'
+    weblogic_opatch: '1394210'
+    oracleclient:
+    jdk:
+    tuxedo: '122200'
+  '858':
+    weblogic: '122140'
     weblogic_opatch: '1394210'
     oracleclient:
     jdk:
     tuxedo:
-  '858':
-    weblogic: '122140' # '600000000123696'
-    oracleclient:
-    jdk:
-    tuxedo:
-# products:
-#   weblogic: 15991
