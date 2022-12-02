@@ -2,18 +2,18 @@ platform:
   linux: '226P'
   windows: '233P'
 peopletools: 
-  860:
+  '860':
     weblogic: '141100' # '600000000123696'
     oracleclient:
     jdk:
     tuxedo:
-  859:
+  '859':
     weblogic: '141100' # '600000000123696'
     weblogic_opatch: '1394210'
     oracleclient:
     jdk:
     tuxedo:
-  858:
+  '858':
     weblogic: '122140' # '600000000123696'
     oracleclient:
     jdk:

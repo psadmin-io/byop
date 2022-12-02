@@ -15,6 +15,7 @@ from http.cookiejar import MozillaCookieJar
 from multiprocessing.pool import ThreadPool
 from requests.auth import HTTPBasicAuth
 
+# Config Object
 class Config(dict):
     def __init__(self, *args, **kwargs):
         self.config = py.path.local().join('config.json')
@@ -32,6 +33,7 @@ class Config(dict):
         with self.config.open('w') as f:
             f.write(json.dumps(self, indent=2))
 
+# Common Command ptions
 def verbose_option(f):
     def callback(ctx, param, value):
         state = ctx.ensure_object(Config)
@@ -59,13 +61,14 @@ def common_options(f):
     f = quiet_option(f)
     return f
 
+# Initialization
 pass_config = click.make_pass_decorator(Config, ensure=True)
 this = sys.modules[__name__]
 this.config = None
 this.timings = None
 this.codes = {}
-# patch_yml = {}
 
+# Constants
 JDK_PATCHES = "jdk_patches"
 JDK_PATCHES_VERSION = "jdk_patches_version"
 ORACLECLIENT_OPATCH_PATCHES = "oracleclient_opatch_patches"
@@ -77,11 +80,10 @@ WEBLOGIC_OPATCH_PATCHES = "weblogic_opatch_patches"
 WEBLOGIC_PATCHES = "weblogic_patches"
 WEBLOGIC_PATCHES_VERSION = "weblogic_patches_version"
 
+# ###### #
+# cli    #
+# ###### #
 @click.group(no_args_is_help=True)
-# @common_options 
-#####################
-### TODO - mess with common options and getting the --verbose flag to flow into setup_logging() correct from the cli() method
-#####################
 @pass_config
 def cli(config):
     """Bring Your Own Patches - Infrastructure DPK Builder"""
@@ -103,6 +105,9 @@ def cli(config):
 
     pass
 
+# ###### #
+# config #
+# ###### #
 @cli.command()
 @click.option('-u', '--mos-username',
               help='My Oracle Support Username',
@@ -120,6 +125,9 @@ def config(config, mos_username, mos_password):
     config.save()
     logging.info("Configuration save to config.json")
 
+# ####### #
+# cleanup #
+# ####### #
 @cli.command()
 @click.option('--yaml',
               is_flag=True,
@@ -250,24 +258,25 @@ def download_patches():
     try:
         platform = this.codes['platform'][yml['platform']]
         logging.debug("Platform - " + yml['platform'] + ": " + platform)
-    except:
+    except NameError:
         logging.error("Input YAML file must specify platform")
         raise
 
     try:
-        ptversion = str(yml['peopletools'])
+        ptversion = yml['peopletools']
         logging.debug("Download patches for PeopleTools " + ptversion)
-    except:
+    except NameError:
         logging.error("Input YAML file must specify PeopleTools")
         raise
 
     try:
         if yml[WEBLOGIC_PATCHES_VERSION]:
-            release = this.codes['peopletools'][ptversion]['weblogic']
+            logging.info(this.codes['peopletools'])
+            release = this.codes['peopletools'][str(ptversion)]['weblogic']
             logging.debug("PeopleTools - " + yml['peopletools'] + ": " + release)
             get_weblogic_patches(yml, WEBLOGIC_PATCHES_VERSION, platform, release)
-    except:
-        logging.info("No Weblogic Patches")
+    except NameError:
+        logging.info("No Weblogic Patches: " + NameError)
 
     try:
         if yml[WEBLOGIC_OPATCH_PATCHES]:
@@ -275,7 +284,7 @@ def download_patches():
             release = this.codes['peopletools'][yml['peopletools']]['weblogic_opatch']
             logging.debug("PeopleTools - " + yml['peopletools'] + ": " + release)
             get_weblogic_opatch_patches(yml, WEBLOGIC_OPATCH_PATCHES, platform, release)
-    except:
+    except NameError:
         logging.info("No Weblogic OPatch Patches")
 
 def get_weblogic_patches(yml, section, platform, release):
