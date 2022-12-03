@@ -245,6 +245,14 @@ def build_directories():
     except OSError as error:
         logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], TUXEDO_PATCHES))
     try:
+        os.makedirs(os.path.join(this.config['archive_dir'], ORACLECLIENT_PATCHES), exist_ok = True)
+    except OSError as error:
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], ORACLECLIENT_PATCHES))
+    try:
+        os.makedirs(os.path.join(this.config['archive_dir'], ORACLECLIENT_OPATCH_PATCHES), exist_ok = True)
+    except OSError as error:
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], ORACLECLIENT_OPATCH_PATCHES))
+    try:
         os.makedirs(os.path.join(this.config['archive_dir'], JDK_PATCHES), exist_ok = True)
     except OSError as error:
         logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], JDK_PATCHES))
@@ -300,6 +308,18 @@ def download_patches():
     else:
         logging.info("No Tuxedo Patches")
 
+    if yml.get(ORACLECLIENT):
+        release = this.codes[PEOPLETOOLS][str(ptversion)][ORACLECLIENT]
+        get_oracleclient_patches(session, yml, ORACLECLIENT, platform, release)
+    else:
+        logging.info("No Oracle Client Patches")
+
+    if yml.get(ORACLECLIENT_OPATCH):
+        release = this.codes[PEOPLETOOLS][str(ptversion)][ORACLECLIENT_OPATCH]
+        get_oracleclient_opatch_patches(session, yml, ORACLECLIENT_OPATCH, platform, release)
+    else:
+        logging.info("No Oracle Client OPatch Patches")
+
 def get_weblogic_patches(session, yml, section, platform, release):
     timing_key = "weblogic patches"
     start_timing(timing_key)
@@ -310,7 +330,6 @@ def get_weblogic_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Weblogic")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        logging.info(" - Downloading WebLogic Patch: " + str(patch))
         file_name = get_patch(session, patch, platform, release, WEBLOGIC_PATCHES)
         if file_name:
             downloaded = True
@@ -326,7 +345,6 @@ def get_weblogic_patches(session, yml, section, platform, release):
         logging.debug(yaml.dump(weblogic_patches))
         __write_to_yaml(weblogic_patches, WEBLOGIC_PATCHES)
 
-    
     end_timing(timing_key)
 
 def get_weblogic_opatch_patches(session, yml, section, platform, release):
@@ -335,10 +353,9 @@ def get_weblogic_opatch_patches(session, yml, section, platform, release):
     
     patches = {}
 
-    logging.info("Downloading " + str(len(yml[section])) + " patches for " + timing_key)
+    logging.info("Downloading " + str(len(yml[section])) + " patches for Weblogic OPatch Patches")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        logging.info(" - Downloading Patch: " + str(patch))
         file_name = get_patch(session, patch, platform, release, section)
         if file_name:
             downloaded = True
@@ -362,7 +379,6 @@ def get_tuxedo_patches(session, yml, section, platform, release):
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
         patch,version=patch.split(':', 1)
-        logging.info(" - Downloading Tuxedo Patch: " + str(patch))
         file_name = get_patch(session, patch, platform, release, TUXEDO_PATCHES)
         if file_name:
             downloaded = True
@@ -380,11 +396,60 @@ def get_tuxedo_patches(session, yml, section, platform, release):
 
     end_timing(timing_key)
 
+def get_oracleclient_patches(session, yml, section, platform, release):
+    timing_key = "oracleclient patches"
+    start_timing(timing_key)
+    
+    oracleclient_patches = {}
+    oracleclient_patches_version = {}
+
+    logging.info("Downloading " + str(len(yml[section])) + " patches for Oracle Client")
+    downloaded = False
+    for i, patch in enumerate(yml[section], start=1):
+        file_name = get_patch(session, patch, platform, release, ORACLECLIENT_PATCHES)
+        if file_name:
+            downloaded = True
+            oracleclient_patches_version["patch" + str(i)] = str(patch)
+            oracleclient_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + ORACLECLIENT_PATCHES + '/' + file_name
+
+    if downloaded:
+        logging.debug(ORACLECLIENT_PATCHES_VERSION + ": ")
+        logging.debug(yaml.dump(oracleclient_patches_version))
+        __write_to_yaml(oracleclient_patches_version, ORACLECLIENT_PATCHES_VERSION)
+
+        logging.debug(ORACLECLIENT_PATCHES + ": ")
+        logging.debug(yaml.dump(oracleclient_patches))
+        __write_to_yaml(oracleclient_patches, ORACLECLIENT_PATCHES)
+
+    end_timing(timing_key)
+
+def get_oracleclient_opatch_patches(session, yml, section, platform, release):
+    timing_key = "oracleclient opatch patches"
+    start_timing(timing_key)
+    
+    patches = {}
+
+    logging.info("Downloading " + str(len(yml[section])) + " patches for Oracle Client OPatch Patches")
+    downloaded = False
+    for i, patch in enumerate(yml[section], start=1):
+        file_name = get_patch(session, patch, platform, release, section)
+        if file_name:
+            downloaded = True
+            patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + ORACLECLIENT_OPATCH_PATCHES + '/' + file_name
+
+    if downloaded:
+        logging.debug(ORACLECLIENT_OPATCH_PATCHES + ": ")
+        logging.debug(yaml.dump(patches))
+        __write_to_yaml(patches, ORACLECLIENT_OPATCH_PATCHES)
+
+    end_timing(timing_key)
+
 def get_mos_authentication():
     # Copied from ioco - thanks Kyle!
     timing_key = "get_mos_authentication"
     start_timing(timing_key)
     
+    logging.info("Authenticating with MOS")
     logging.debug("Creating auth cookie from MOS")
     cookie_file = os.path.join(this.config['tmp_dir'], 'mos.cookie')
 
@@ -415,7 +480,7 @@ def get_mos_authentication():
         # Save session cookies to be used by downloader later on...
         this.config['mos_cookies'] = s.cookies
 
-        # Validate login was success                 
+        # Validate login was success
         if r.ok:
             logging.info("MOS Login was Successful")
         else:
@@ -433,15 +498,20 @@ def get_mos_authentication():
 def get_patch(session, patch, platform, release, product):
     # Copied from ioco - thanks Kyle!
     if not __get_patch_status(patch):
-        logging.debug("Patch not downloaded")
-        file_name = __get_mos_patch(session, patch, platform, release, product)
-        return file_name
+        logging.info(" - Downloading Oracle Client Patch: " + str(patch))
+        file_name = __find_mos_patch(session, patch, platform, release)
+        logging.debug("File Name: " + str(file_name))
     else:
-        logging.info("Patch already downloaded: " + str(patch))
+        logging.info(" - Patch already downloaded: " + str(patch))
         return False
 
-def __get_mos_patch(session, patch, platform, release, product):
-    timing_key = "__get_mos_patch"
+    if file_name:
+        file = __copy_files(file_name, product, patch)
+
+    return file
+
+def __find_mos_patch(session, patch, platform, release):
+    timing_key = "__find_mos_patch"
     start_timing(timing_key)
     logging.debug(" - Downloading files from MOS")
     try:
@@ -451,7 +521,7 @@ def __get_mos_patch(session, patch, platform, release, product):
         r = session.get(mos_uri_search) 
         search_results = r.content.decode('utf-8')
         
-        # Validate search results                 
+        # Validate search results
         if r.ok:
             logging.debug("Search results return success")
         else:
@@ -462,8 +532,8 @@ def __get_mos_patch(session, patch, platform, release, product):
         logging.error("Issue getting MOS search results")
         end_timing(timing_key)
         raise
-        
-    try:        
+
+    try:
         # Extract download links to list
         if release:
             pattern = "https.+?Download\/process_form\/.*" + release + ".*\.zip*"
@@ -494,7 +564,12 @@ def __get_mos_patch(session, patch, platform, release, product):
 
     # multi thread download
     results = ThreadPool(this.config.get('download_threads')).imap_unordered(__download_file, download_links)
-    for r in results:
+    end_timing(timing_key)
+    return results
+
+def __copy_files(files, product, patch):
+
+    for r in files:
         target_dir = os.path.join(this.config['archive_dir'], product, r)
         logging.debug("    Moving to patch to " + str(target_dir))
         try:
@@ -512,8 +587,7 @@ def __get_mos_patch(session, patch, platform, release, product):
         __update_patch_status(patch, True)
         logging.debug("Update Patch Status - " + str(patch) + ": true")
 
-    end_timing(timing_key)
-    return r # The last filename
+    return r # The last filename - should only be one patch in the list
 
 def __download_file(url):
     # assumes that the last segment after the / represents the file name
@@ -559,7 +633,7 @@ def __get_patch_status(patch):
         except:
             return False
     else:
-        logging.info("Redownload Flag is set - skipping check of patch status")
+        logging.debug("Redownload Flag is set - skipping check of patch status")
         pass
 
 def __update_patch_status(step, status):
