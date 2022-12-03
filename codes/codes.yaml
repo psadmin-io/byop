@@ -7,19 +7,12 @@ peopletools:
     weblogic_opatch: '1394210'
     oracleclient: '190000'
     oracleclient_opatch: '122010'
-    jdk:
+    jdk: '11017'
     tuxedo: '122200'
   '859':
     weblogic: '141100'
     weblogic_opatch: '1394210'
     oracleclient: '190000'
     oracleclient_opatch: '122010'
-    jdk:
-    tuxedo: '122200'
-  '858':
-    weblogic: '122140'
-    weblogic_opatch: '1394210'
-    oracleclient: '122000'
-    oracleclient_opatch: '122010'
-    jdk:
+    jdk: '11017'
     tuxedo: '122200'

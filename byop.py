@@ -319,6 +319,12 @@ def download_patches():
         get_oracleclient_opatch_patches(session, yml, ORACLECLIENT_OPATCH, platform, release)
     else:
         logging.info("No Oracle Client OPatch Patches")
+    
+    if yml.get(JDK):
+        release = this.codes[PEOPLETOOLS][str(ptversion)][JDK]
+        get_jdk_patches(session, yml, JDK, platform, release)
+    else:
+        logging.info("No JDK Patches")
 
 def get_weblogic_patches(session, yml, section, platform, release):
     timing_key = "weblogic patches"
@@ -444,6 +450,38 @@ def get_oracleclient_opatch_patches(session, yml, section, platform, release):
 
     end_timing(timing_key)
 
+def get_jdk_patches(session, yml, section, platform, release):
+    timing_key = "jdk patches"
+    start_timing(timing_key)
+    
+    jdk_patches = {}
+    jdk_patches_version = {}
+
+    logging.info("Downloading " + str(len(yml[section])) + " patches for JDK")
+    downloaded = False
+    for i, patch in enumerate(yml[section], start=1):
+        patch,version=patch.split(':', 1)
+        file_name = get_patch(session, patch, platform, release, JDK_PATCHES)
+        if file_name:
+            downloaded = True
+            jdk_patches_version["patch" + str(i)] = str(version)
+            jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES_VERSION + '/' + file_name
+
+    if downloaded:
+        logging.debug(JDK_PATCHES_VERSION + ": ")
+        logging.debug(yaml.dump(jdk_patches_version))
+        __write_to_yaml(jdk_patches_version, JDK_PATCHES_VERSION)
+
+        logging.debug(JDK_PATCHES + ": ")
+        logging.debug(yaml.dump(jdk_patches))
+        __write_to_yaml(jdk_patches, JDK_PATCHES)
+
+    ### TODO - convert .zip to .tgz
+    ### TODO - rename to pt-jdk-<version>.tgz
+
+    end_timing(timing_key)
+
+# MOS Functions
 def get_mos_authentication():
     # Copied from ioco - thanks Kyle!
     timing_key = "get_mos_authentication"
@@ -604,6 +642,7 @@ def __download_file(url):
 
     return file_name
 
+# File Management Functions
 def __get_patch_status(patch):
     # Checking Patch download status
     if not this.config.get('redownload'):
@@ -661,6 +700,7 @@ def __write_to_yaml(dict, header):
     with open(this.config.get('tgt_yaml'), 'w') as tgt_yaml:
         yaml.dump(tgt, tgt_yaml, sort_keys=True, indent=2)
 
+# Logging and Timings
 def setup_logging():
 
     if this.config.get("verbose") == True:
