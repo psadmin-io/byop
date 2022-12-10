@@ -10,9 +10,13 @@ import datetime
 import click
 import shutil
 import requests
+import tarfile
+from zipfile import ZipFile
 from pathlib import Path
 from http.cookiejar import MozillaCookieJar
 from multiprocessing.pool import ThreadPool
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from requests.auth import HTTPBasicAuth
 
 # Config Object
@@ -86,6 +90,9 @@ WEBLOGIC_OPATCH_PATCHES = "weblogic_opatch_patches"
 WEBLOGIC = "weblogic"
 WEBLOGIC_PATCHES = "weblogic_patches"
 WEBLOGIC_PATCHES_VERSION = "weblogic_patches_version"
+ARCHIVE = 'archive_dir'
+TEMP = 'tmp_dir'
+STATUS = 'patch_status_file'
 
 # ###### #
 # cli    #
@@ -103,12 +110,12 @@ def cli(config):
     this.total_time_key = 'TOTAL TIME'
     this.timings_printed = False
 
-    if not config.get('archive_dir'):
-        this.config['archive_dir'] = os.path.join(os.getcwd(), 'cpu_archives')
-    if not config.get('tmp_dir'):
-        this.config['tmp_dir'] = os.path.join(os.getcwd(), 'tmp')
-    if not config.get('patch_status_file'):
-        this.config['patch_status_file'] = os.path.join(this.config['tmp_dir'], 'patch_status_file')
+    if not config.get(ARCHIVE):
+        this.config[ARCHIVE] = os.path.join(os.getcwd(), 'cpu_archives')
+    if not config.get(TEMP):
+        this.config[TEMP] = os.path.join(os.getcwd(), 'tmp')
+    if not config.get(STATUS):
+        this.config[STATUS] = os.path.join(this.config[TEMP], STATUS)
 
     pass
 
@@ -151,7 +158,7 @@ def cleanup(config, yaml, tgt_yaml, verbose, quiet):
     this.config['quiet'] = quiet
     setup_logging()
 
-    files = glob.glob(config.get('archive_dir') + "/*/*", recursive=True)
+    files = glob.glob(config.get(ARCHIVE) + "/*/*", recursive=True)
     if files:
         for f in files:
             try:
@@ -162,7 +169,7 @@ def cleanup(config, yaml, tgt_yaml, verbose, quiet):
     else:
         logging.info("No patches to cleanup")
 
-    files = glob.glob(config.get('tmp_dir') + "/*", recursive=True)
+    files = glob.glob(config.get(TEMP) + "/*", recursive=True)
     if files:
         for f in files:
             try:
@@ -228,39 +235,39 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
 # ################# #
 def build_directories():
     try:
-        os.makedirs(this.config['archive_dir'], exist_ok = True)
+        os.makedirs(this.config[ARCHIVE], exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % this.config['archive_dir'])
+        logging.error("Directory '%s' can not be created" % this.config[ARCHIVE])
 
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], WEBLOGIC_PATCHES), exist_ok = True)
+        os.makedirs(os.path.join(this.config[ARCHIVE], WEBLOGIC_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], WEBLOGIC_PATCHES))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[ARCHIVE], WEBLOGIC_PATCHES))
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], WEBLOGIC_OPATCH_PATCHES), exist_ok = True)
+        os.makedirs(os.path.join(this.config[ARCHIVE], WEBLOGIC_OPATCH_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], WEBLOGIC_OPATCH_PATCHES))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[ARCHIVE], WEBLOGIC_OPATCH_PATCHES))
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], TUXEDO_PATCHES), exist_ok = True)
+        os.makedirs(os.path.join(this.config[ARCHIVE], TUXEDO_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], TUXEDO_PATCHES))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[ARCHIVE], TUXEDO_PATCHES))
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], ORACLECLIENT_PATCHES), exist_ok = True)
+        os.makedirs(os.path.join(this.config[ARCHIVE], ORACLECLIENT_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], ORACLECLIENT_PATCHES))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[ARCHIVE], ORACLECLIENT_PATCHES))
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], ORACLECLIENT_OPATCH_PATCHES), exist_ok = True)
+        os.makedirs(os.path.join(this.config[ARCHIVE], ORACLECLIENT_OPATCH_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], ORACLECLIENT_OPATCH_PATCHES))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[ARCHIVE], ORACLECLIENT_OPATCH_PATCHES))
     try:
-        os.makedirs(os.path.join(this.config['archive_dir'], JDK_PATCHES), exist_ok = True)
+        os.makedirs(os.path.join(this.config[ARCHIVE], JDK_PATCHES), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['archive_dir'], JDK_PATCHES))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[ARCHIVE], JDK_PATCHES))
 
     try:
-        os.makedirs(os.path.join(this.config['tmp_dir']), exist_ok = True)
+        os.makedirs(os.path.join(this.config[TEMP]), exist_ok = True)
     except OSError as error:
-        logging.error("Directory '%s' can not be created" % os.path.join(this.config['tmp_dir']))
+        logging.error("Directory '%s' can not be created" % os.path.join(this.config[TEMP]))
 
 def download_patches():
     with open(os.path.join(os.getcwd(), 'codes', 'codes.yaml')) as c:
@@ -288,7 +295,7 @@ def download_patches():
 
     # Get MOS Session for downloads
     session = get_mos_authentication()
-    
+
     # Download patches
     if yml.get(WEBLOGIC):
         release = this.codes[PEOPLETOOLS][str(ptversion)][WEBLOGIC]
@@ -476,9 +483,6 @@ def get_jdk_patches(session, yml, section, platform, release):
         logging.debug(yaml.dump(jdk_patches))
         __write_to_yaml(jdk_patches, JDK_PATCHES)
 
-    ### TODO - convert .zip to .tgz
-    ### TODO - rename to pt-jdk-<version>.tgz
-
     end_timing(timing_key)
 
 # MOS Functions
@@ -489,7 +493,7 @@ def get_mos_authentication():
     
     logging.info("Authenticating with MOS")
     logging.debug("Creating auth cookie from MOS")
-    cookie_file = os.path.join(this.config['tmp_dir'], 'mos.cookie')
+    cookie_file = os.path.join(this.config[TEMP], 'mos.cookie')
 
     # eat any old cookies
     if os.path.exists(cookie_file):
@@ -536,14 +540,16 @@ def get_mos_authentication():
 def get_patch(session, patch, platform, release, product):
     # Copied from ioco - thanks Kyle!
     if not __get_patch_status(patch):
-        logging.info(" - Downloading Oracle Client Patch: " + str(patch))
         file_name = __find_mos_patch(session, patch, platform, release)
-        logging.debug("File Name: " + str(file_name))
+        logging.debug(" - Downloaded File Name: " + str(file_name))
     else:
         logging.info(" - Patch already downloaded: " + str(patch))
         return False
 
     if file_name:
+        if product == JDK_PATCHES:
+            logging.info("Converting JDK to DPK Format")
+            file_name = __convert_jdk_archive(file_name, release)
         file = __copy_files(file_name, product, patch)
 
     return file
@@ -579,7 +585,7 @@ def __find_mos_patch(session, patch, platform, release):
             pattern = "https.+?Download\/process_form\/.*\.zip.*"
         logging.debug("Search Pattern: " + pattern)
         download_links = re.findall(pattern,search_results)
-        download_links_file = os.path.join(this.config['tmp_dir'], 'mos-download.links')
+        download_links_file = os.path.join(this.config[TEMP], 'mos-download.links')
         # Write download links to file
         f = open(download_links_file,"w")
         for link in download_links:
@@ -591,6 +597,7 @@ def __find_mos_patch(session, patch, platform, release):
         # Validate download links
         if len(download_links) > 0:
             logging.debug(" - Downloading " + str(len(download_links)) + " files")
+            logging.debug(" - URL: " + str(download_links))
         else:
             logging.error("No download links found")
             error_timings(timing_key)
@@ -601,17 +608,23 @@ def __find_mos_patch(session, patch, platform, release):
         raise
 
     # multi thread download
-    results = ThreadPool(this.config.get('download_threads')).imap_unordered(__download_file, download_links)
+    # results = ThreadPool(this.config.get('download_threads')).imap_unordered(__download_file, download_links)
+    results = __download_file(download_links)
+    logging.debug("Download Results: " + str(results))
+
     end_timing(timing_key)
     return results
 
 def __copy_files(files, product, patch):
 
-    for r in files:
-        target_dir = os.path.join(this.config['archive_dir'], product, r)
-        logging.debug("    Moving to patch to " + str(target_dir))
+    for file in files:
+        tmp_file = os.path.join(this.config[TEMP], file)
+        target_dir = os.path.join(this.config[ARCHIVE], product, file)
+
+        logging.debug("    Moving to patch from \n " + str(tmp_file) + " to " + str(target_dir))
         try:
-            shutil.move(os.path.join(this.config['tmp_dir'], r), target_dir)
+            shutil.move(tmp_file, target_dir)
+            logging.debug("    - [DONE] " + file)
         except FileNotFoundError: 
             logging.error("Patch file file not found")
         except PermissionError: 
@@ -620,25 +633,29 @@ def __copy_files(files, product, patch):
             logging.error("The target directory is incorrect: " + target_dir)
         except:
             logging.error("Encountered an error moving the patch to the cpu_archives/ " + str(product) + " folder")
-        logging.debug("    - [DONE] " + r)
 
         __update_patch_status(patch, True)
         logging.debug("Update Patch Status - " + str(patch) + ": true")
 
-    return r # The last filename - should only be one patch in the list
+        return file # The last filename - should only be one patch in the list
 
-def __download_file(url):
+def __download_file(urls):
     # assumes that the last segment after the / represents the file name
     # if url is abc/xyz/file.txt, the file name will be file.txt
-    file_name_start_pos = url.rfind("=") + 1
-    file_name = url[file_name_start_pos:]
-    s = requests.session()
-    s.cookies =  this.config.get('mos_cookies') 
-    r = s.get(url, stream=True)
-    if r.status_code == requests.codes.ok:
-        with open(this.config['tmp_dir'] + "/" + file_name, 'wb') as f: 
-            for data in r:
-                f.write(data)
+    for url in urls:
+        file_name_start_pos = url.rfind("=") + 1
+        file_name = url[file_name_start_pos:]
+        s = requests.session()
+        s.cookies =  this.config.get('mos_cookies') 
+        r = s.get(url, stream=True, allow_redirects=True)
+        logging.debug("Response Code: " + str(r.status_code))
+        if r.status_code == 302:
+            r = s.get(r.headers['Location'])
+            logging.debug("Redirect URL: " + str(r.headers['Location']))
+        if r.status_code == requests.codes.ok:
+            with open(this.config[TEMP] + "/" + file_name, 'wb') as f: 
+                for data in r:
+                    f.write(data)
 
     return file_name
 
@@ -646,10 +663,10 @@ def __download_file(url):
 def __get_patch_status(patch):
     # Checking Patch download status
     if not this.config.get('redownload'):
-        if not os.path.exists(this.config.get('patch_status_file')):
+        if not os.path.exists(this.config.get(STATUS)):
             logging.debug("Patch Status File missing - creating it now")
             try:
-                with open(this.config.get('patch_status_file'),'w') as f:
+                with open(this.config.get(STATUS),'w') as f:
                     patch_status = {}
                     json.dump(patch_status, f)
             except FileNotFoundError:
@@ -660,7 +677,7 @@ def __get_patch_status(patch):
                 raise
         else:
             try:
-                with open(this.config.get('patch_status_file')) as f:
+                with open(this.config.get(STATUS)) as f:
                     patch_status = json.load(f)
             except:
                 logging.error("Issue opening Patch status file")
@@ -677,7 +694,7 @@ def __get_patch_status(patch):
 
 def __update_patch_status(step, status):
     try:
-        with open(this.config.get('patch_status_file'), 'r+') as f:
+        with open(this.config.get(STATUS), 'r+') as f:
             patch_status = json.load(f)
             patch_status[step] = status
             f.seek(0)
@@ -699,6 +716,38 @@ def __write_to_yaml(dict, header):
     
     with open(this.config.get('tgt_yaml'), 'w') as tgt_yaml:
         yaml.dump(tgt, tgt_yaml, sort_keys=True, indent=2)
+
+def __convert_jdk_archive(file, release):
+
+    zip_file = os.path.join(this.config[TEMP], file)
+    tarfile_orig =  os.path.join(this.config.get(TEMP), 'jdk-' + release + '_linux-x64_bin.tar.gz')
+    tarfile_pt = 'pt-jdk-' + release + '.tgz'
+    tarfile_dir = os.path.join(this.config.get(TEMP), 'tar')
+
+    # Extract the .zip
+    logging.debug("  - JDK - unzipping download")
+    with ZipFile(zip_file) as zipf:
+        zipf.extractall(this.config[TEMP])
+
+    # Extract the .tar.gz file - it contains an extra top directory that breaks with the DPK
+    if (os.path.exists(tarfile_orig)):
+        logging.debug("  - JDK - untarring .tar.gz file to remove parent directory")
+        tar1 = tarfile.open(tarfile_orig)
+        tar1.extractall(this.config[TEMP])
+        tar1.close
+
+    # Repackage the tarball and rename for the DPK
+    logging.debug("  - JDK - creating DPK compatible .tgz")
+    file = __tardirectory(tarfile_dir, tarfile_pt)
+    return file
+
+def __tardirectory(path,name):
+    with tarfile.open(name, "w:gz") as tarhandle:
+        for root, dirs, files in os.walk(path):
+            for f in files:
+                tarhandle.add(os.path.join(root, f))
+
+        return tarhandle
 
 # Logging and Timings
 def setup_logging():
