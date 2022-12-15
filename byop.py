@@ -550,6 +550,7 @@ def get_patch(session, patch, platform, release, product):
         if product == JDK_PATCHES:
             logging.info("Converting JDK to DPK Format")
             file_name = __convert_jdk_archive(file_name, release)
+            logging.debug("JDK Files: " + file_name + " and Release: " + release)
         file = __copy_files(file_name, product, patch)
 
     return file
@@ -557,6 +558,7 @@ def get_patch(session, patch, platform, release, product):
 def __find_mos_patch(session, patch, platform, release):
     timing_key = "__find_mos_patch"
     start_timing(timing_key)
+
     logging.debug(" - Downloading files from MOS")
     try:
         # Use same session to search for downloads
@@ -580,7 +582,8 @@ def __find_mos_patch(session, patch, platform, release):
     try:
         # Extract download links to list
         if release:
-            pattern = "https.+?Download\/process_form\/.*" + release + ".*\.zip*"
+            simple_release = release.replace('.', '')
+            pattern = "https.+?Download\/process_form\/.*" + simple_release + ".*\.zip*"
         else:
             pattern = "https.+?Download\/process_form\/.*\.zip.*"
         logging.debug("Search Pattern: " + pattern)
@@ -615,29 +618,29 @@ def __find_mos_patch(session, patch, platform, release):
     end_timing(timing_key)
     return results
 
-def __copy_files(files, product, patch):
+def __copy_files(file, product, patch):
 
-    for file in files:
-        tmp_file = os.path.join(this.config[TEMP], file)
-        target_dir = os.path.join(this.config[ARCHIVE], product, file)
+    # for file in files:
+    tmp_file = os.path.join(this.config[TEMP], file)
+    target_dir = os.path.join(this.config[ARCHIVE], product, file)
 
-        logging.debug("    Moving to patch from \n " + str(tmp_file) + " to " + str(target_dir))
-        try:
-            shutil.move(tmp_file, target_dir)
-            logging.debug("    - [DONE] " + file)
-        except FileNotFoundError: 
-            logging.error("Patch file file not found")
-        except PermissionError: 
-            logging.error("You do not have permssion to copy to " + target_dir)
-        except NotADirectoryError:
-            logging.error("The target directory is incorrect: " + target_dir)
-        except:
-            logging.error("Encountered an error moving the patch to the cpu_archives/ " + str(product) + " folder")
+    logging.debug("    Moving to patch from  " + str(tmp_file) + " to " + str(target_dir))
+    try:
+        shutil.move(tmp_file, target_dir)
+        logging.debug("    - [DONE] " + file)
+    except FileNotFoundError: 
+        logging.error("Patch file file not found")
+    except PermissionError: 
+        logging.error("You do not have permssion to copy to " + target_dir)
+    except NotADirectoryError:
+        logging.error("The target directory is incorrect: " + target_dir)
+    except:
+        logging.error("Encountered an error moving the patch to the cpu_archives/ " + str(product) + " folder")
 
-        __update_patch_status(patch, True)
-        logging.debug("Update Patch Status - " + str(patch) + ": true")
+    __update_patch_status(patch, True)
+    logging.debug("Update Patch Status - " + str(patch) + ": true")
 
-        return file # The last filename - should only be one patch in the list
+    return file # The last filename - should only be one patch in the list
 
 def __download_file(urls):
     # assumes that the last segment after the / represents the file name
@@ -719,10 +722,17 @@ def __write_to_yaml(dict, header):
 
 def __convert_jdk_archive(file, release):
 
+    # simple_release = release.replace('.', '')
     zip_file = os.path.join(this.config[TEMP], file)
+    logging.debug("Zip file: " + str(zip_file))
     tarfile_orig =  os.path.join(this.config.get(TEMP), 'jdk-' + release + '_linux-x64_bin.tar.gz')
-    tarfile_pt = 'pt-jdk-' + release + '.tgz'
+    logging.debug("Delivered Tarball: " + str(tarfile_orig))
+    tarfile_pt = os.path.join(this.config.get(TEMP), 'pt-jdk-' + release + '.tgz')
     tarfile_dir = os.path.join(this.config.get(TEMP), 'tar')
+    try:
+        os.makedirs(tarfile_dir, exist_ok = True)
+    except OSError as error:
+        logging.error("Directory '%s' can not be created" % tarfile_dir)
 
     # Extract the .zip
     logging.debug("  - JDK - unzipping download")
@@ -731,15 +741,28 @@ def __convert_jdk_archive(file, release):
 
     # Extract the .tar.gz file - it contains an extra top directory that breaks with the DPK
     if (os.path.exists(tarfile_orig)):
+        logging.debug("Cleanup tmp/tar directory before re-extracting JDK tarball")
+        # JDK tar permissions cause errors when cleanup is run - change them before?
+        files = glob.glob(config.get(TEMP) + "/tar/*", recursive=True)
+        if files:
+            for f in files:
+                try:
+                    shutil.rmtree(f)
+                    logging.debug("Removed file: " + str(f))
+                except OSError as e:
+                    logging.error("Error: %s : %s" % (f, e.strerror))
         logging.debug("  - JDK - untarring .tar.gz file to remove parent directory")
         tar1 = tarfile.open(tarfile_orig)
-        tar1.extractall(this.config[TEMP])
+        tar1.extractall(path=tarfile_dir) #, set_attrs=False)
         tar1.close
+    else:
+        logging.error("No tarball matching filename found: " + tarfile_orig)
 
     # Repackage the tarball and rename for the DPK
     logging.debug("  - JDK - creating DPK compatible .tgz")
     file = __tardirectory(tarfile_dir, tarfile_pt)
-    return file
+    logging.debug("DPK Compatible JDK Archive: " + os.path.basename(file))
+    return os.path.basename(file)
 
 def __tardirectory(path,name):
     with tarfile.open(name, "w:gz") as tarhandle:
@@ -747,7 +770,7 @@ def __tardirectory(path,name):
             for f in files:
                 tarhandle.add(os.path.join(root, f))
 
-        return tarhandle
+        return name
 
 # Logging and Timings
 def setup_logging():

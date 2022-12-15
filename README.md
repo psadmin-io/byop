@@ -49,3 +49,8 @@ virtualenv -p python3 venv
 
 pip install --editable .
 ```
+
+# MOS Simple Search
+
+To troubleshoot download issues, start with the MOS Simple Search page to see if the patch is available: https://updates.oracle.com/Orion/SimpleSearch/process_form
+
