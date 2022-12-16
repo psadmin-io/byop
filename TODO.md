@@ -1,4 +1,4 @@
-1. Fix jdk .zip - change working dir before zipping
-1. Fix .zip filename (8.59 instead of 859)
+1. Encrypt password in config.json
 2. Add ptinfra-manifest to .zip file
 3. Don't call __copy_file if patch is not found - fix error message
+4. Test on Windows

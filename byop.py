@@ -193,12 +193,13 @@ def cleanup(config, tmp, only_tmp, yaml, tgt_yaml, zip, zip_dir, only_zip, verbo
         
         # YAML files
         if yaml:
-            if os.path.exists(tgt_yaml):
+            yamlfile = os.path.join(this.config.get(OUTPUT), tgt_yaml)
+            if os.path.exists(yamlfile):
                 try:
-                    os.remove(tgt_yaml)
-                    logging.info("Removed " + str(tgt_yaml))
+                    os.remove(yamlfile)
+                    logging.info("Removed " + str(yamlfile))
                 except OSError as e:
-                    logging.error("Error: %s : %s" % (tgt_yaml, e.strerror))
+                    logging.error("Error: %s : %s" % (yamlfile, e.strerror))
             else:
                 logging.info("No " + tgt_yaml + " file to cleanup")
 
@@ -857,6 +858,7 @@ def __convert_jdk_archive(file, release):
 
     # Extract the .tar.gz file - it contains an extra top directory that breaks with the DPK
     if (os.path.exists(tarfile_orig)):
+
         logging.debug("Cleanup tmp/tar directory before re-extracting JDK tarball")
         # JDK tar permissions cause errors when cleanup is run - change them before?
         files = glob.glob(config.get(TEMP) + "/tar/*", recursive=True)
@@ -871,6 +873,7 @@ def __convert_jdk_archive(file, release):
         tar1 = tarfile.open(tarfile_orig)
         tar1.extractall(path=tarfile_dir) #, set_attrs=False)
         tar1.close
+        # file = __remove_top_level_folder(tarfile_orig, tarfile_dir, tarfile_pt)
     else:
         logging.error("No tarball matching filename found: " + tarfile_orig)
 
@@ -878,15 +881,23 @@ def __convert_jdk_archive(file, release):
     logging.debug("  - JDK - creating DPK compatible .tgz")
     file = __tardirectory(tarfile_dir, tarfile_pt)
     logging.debug("DPK Compatible JDK Archive: " + os.path.basename(file))
+
+    shutil.rmtree(tarfile_dir)
     return os.path.basename(file)
 
 def __tardirectory(path, name):
-    with tarfile.open(name, "w:gz") as tarhandle:
-        for root, dirs, files in os.walk(path):
-            for f in files:
-                tarhandle.add(os.path.join(root, f))
+    original_dir = os.getcwd()
+    top_level_folder = next(os.walk(path))[1][0]
+    os.chdir(os.path.join(path, top_level_folder))
+    logging.debug("Top Level Folder Name: " + top_level_folder)
 
-        return name
+    with tarfile.open(name, "w:gz") as tarhandle:
+        for root, dirs, files in os.walk(os.getcwd()):
+            for file in files:
+                tarhandle.add(os.path.relpath(os.path.join(root, file)))
+
+    os.chdir(original_dir)
+    return name
 
 def __zipdirectory(filename, folders):
     with zipfile.ZipFile(os.path.join(this.config.get(OUTPUT), filename),'a') as zip:
@@ -895,6 +906,7 @@ def __zipdirectory(filename, folders):
         os.chdir(this.config.get(OUTPUT))
         for folder in folders:
             path = os.path.join(os.path.basename(this.config.get(ARCHIVE)), folder)
+
             logging.debug("Zip path: " + path)
             logging.debug("Zip file: " + str(zip))
             for dirname, subdirs, files in os.walk(path):
