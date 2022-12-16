@@ -4,7 +4,9 @@
 !codes/codes.yaml
 tmp/*
 cpu_archives/*
-
+zip/*
+yaml/*
+output/*
 
 # Python files
 *.egg-info/*

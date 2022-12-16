@@ -11,12 +11,12 @@ import click
 import shutil
 import requests
 import tarfile
-from zipfile import ZipFile
-from pathlib import Path
-from http.cookiejar import MozillaCookieJar
-from multiprocessing.pool import ThreadPool
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import as_completed
+import zipfile
+# from pathlib import Path
+# from http.cookiejar import MozillaCookieJar
+# from multiprocessing.pool import ThreadPool
+# from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import as_completed
 from requests.auth import HTTPBasicAuth
 
 # Config Object
@@ -93,6 +93,7 @@ WEBLOGIC_PATCHES_VERSION = "weblogic_patches_version"
 ARCHIVE = 'archive_dir'
 TEMP = 'tmp_dir'
 STATUS = 'patch_status_file'
+OUTPUT = 'zip_dir'
 
 # ###### #
 # cli    #
@@ -110,8 +111,10 @@ def cli(config):
     this.total_time_key = 'TOTAL TIME'
     this.timings_printed = False
 
+    if not config.get(OUTPUT):
+        this.config[OUTPUT] = os.path.join(os.getcwd(), 'output')
     if not config.get(ARCHIVE):
-        this.config[ARCHIVE] = os.path.join(os.getcwd(), 'cpu_archives')
+        this.config[ARCHIVE] = os.path.join(config.get(OUTPUT), 'cpu_archives')
     if not config.get(TEMP):
         this.config[TEMP] = os.path.join(os.getcwd(), 'tmp')
     if not config.get(STATUS):
@@ -143,6 +146,14 @@ def config(config, mos_username, mos_password):
 # cleanup #
 # ####### #
 @cli.command()
+@click.option('--tmp',
+              is_flag=True,
+              default=True,
+              help="Delete tmp files")
+@click.option('--only-tmp',
+              is_flag=True,
+              default=False,
+              help="Only delete tmp files")
 @click.option('--yaml',
               is_flag=True,
               default=False,
@@ -150,51 +161,80 @@ def config(config, mos_username, mos_password):
 @click.option('--tgt-yaml', 
               help="Target YAML file to delete. Default is psft_patches.yaml.",
               default='psft_patches.yaml')
+@click.option('--zip',
+              is_flag=True,
+              default=True,
+              help="Include PT-INFRA*.zip in cleanup")
+@click.option('--zip-dir',
+              help="Output directory for PT-INFRA zip file" )
+@click.option('--only-zip',
+              is_flag=True,
+              default=False,
+              help="Only delete PT-INFRA zip file")
 @pass_config
 @common_options
-def cleanup(config, yaml, tgt_yaml, verbose, quiet):
-    """Remove files from the tmp and cpu_archives directories."""
+def cleanup(config, tmp, only_tmp, yaml, tgt_yaml, zip, zip_dir, only_zip, verbose, quiet):
+    """Remove files from the tmp and cpu_archives directories and remove PT-INFRA zip files."""
     this.config['verbose'] = verbose
     this.config['quiet'] = quiet
     setup_logging()
 
-    files = glob.glob(config.get(ARCHIVE) + "/*/*", recursive=True)
-    if files:
-        for f in files:
+    if not only_zip and not only_tmp:
+        # cpu_archives
+        files = glob.glob(config.get(ARCHIVE) + "/*/*", recursive=True)
+        if files:
             try:
-                os.remove(f)
-                logging.info("Removed file: " + str(f))
+                shutil.rmtree(config.get(ARCHIVE))
+                logging.info("Removed cpu_archive files")
             except OSError as e:
-                logging.error("Error: %s : %s" % (f, e.strerror))
-    else:
-        logging.info("No patches to cleanup")
-
-    files = glob.glob(config.get(TEMP) + "/*", recursive=True)
-    if files:
-        for f in files:
-            try:
-                os.remove(f)
-                logging.info("Removed file: " + str(f))
-            except OSError as e:
-                logging.error("Error: %s : %s" % (f, e.strerror))
-    else:
-        logging.info("No temporary files to cleanup")
-
-    if yaml:
-        if os.path.exists(tgt_yaml):
-            try:
-                os.remove(tgt_yaml)
-                logging.info("Removed file: " + str(tgt_yaml))
-            except OSError as e:
-                logging.error("Error: %s : %s" % (tgt_yaml, e.strerror))
+                logging.error("Error: %s : %s" % (files, e.strerror))
         else:
-            logging.info("No " + tgt_yaml + " file to cleanup")
+            logging.info("No patches to cleanup")
+        
+        # YAML files
+        if yaml:
+            if os.path.exists(tgt_yaml):
+                try:
+                    os.remove(tgt_yaml)
+                    logging.info("Removed " + str(tgt_yaml))
+                except OSError as e:
+                    logging.error("Error: %s : %s" % (tgt_yaml, e.strerror))
+            else:
+                logging.info("No " + tgt_yaml + " file to cleanup")
+
+    if (tmp or only_tmp) and not only_zip:
+        # tmp
+        files = glob.glob(config.get(TEMP) + "/*", recursive=True)
+        if files:
+            try:
+                shutil.rmtree(config.get(TEMP))
+                logging.info("Removed tmp files")
+            except OSError as e:
+                logging.error("Error: %s : %s" % (files, e.strerror))
+        else:
+            logging.info("No temporary files to cleanup")
+
+    # PT-INFRA zip file
+    if zip or only_zip:
+        if not zip_dir:
+            zip_dir = this.config[OUTPUT]
+        files = glob.glob(os.path.join(zip_dir, "PT-INFRA*.zip"))
+        logging.debug("Zip files to remove: " + str(files))
+        if files:
+            for file in files:
+                try:
+                    os.remove(file)
+                    logging.info("Removed " + file)
+                except OSError as e:
+                    logging.error("Error: %s : %s" % (file, e.strerror))
+        else:
+            logging.info("No PT-INFRA zip to cleanup")
 
 # ##### #
 # build #
 # ##### #
 @cli.command()
-@click.option('-s', '--src-yaml', 
+@click.option('--src-yaml', 
               default="byop.yaml", 
               show_default=True,
               help="Input YAML with IDPK Patches")
@@ -230,14 +270,48 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     print_timings()
     pass
 
+# ### #
+# zip #
+# ### #
+@cli.command()
+@click.option('--src-yaml', 
+              default="byop.yaml", 
+              show_default=True,
+              help="Input YAML with IDPK Patches")
+@click.option('--zip-dir',
+              help="Output directory for PT-INFRA zip file" )
+@common_options
+@pass_config
+def zip(config, src_yaml, zip_dir, verbose, quiet):
+    """Package Infra-DPK files into a .zip file"""
+
+    this.config['verbose'] = verbose
+    this.config['quiet'] = quiet
+    this.config['src_yaml'] = src_yaml
+    if zip_dir:
+        archive_dir = zip_dir
+    else:
+        archive_dir = os.path.join(this.config[OUTPUT])
+    setup_logging()
+    init_timings()
+
+    create_zip_file(archive_dir)
+
+    print_timings()
+
 # ################# #
 # Library Functions #
 # ################# #
 def build_directories():
     try:
+        os.makedirs(this.config[OUTPUT], exist_ok = True)
+    except OSError as error:
+        logging.error("Directory '%s' can not be created" % this.config[OUTPUT])
+    try:
         os.makedirs(this.config[ARCHIVE], exist_ok = True)
     except OSError as error:
         logging.error("Directory '%s' can not be created" % this.config[ARCHIVE])
+
 
     try:
         os.makedirs(os.path.join(this.config[ARCHIVE], WEBLOGIC_PATCHES), exist_ok = True)
@@ -270,28 +344,7 @@ def build_directories():
         logging.error("Directory '%s' can not be created" % os.path.join(this.config[TEMP]))
 
 def download_patches():
-    with open(os.path.join(os.getcwd(), 'codes', 'codes.yaml')) as c:
-        this.codes = yaml.load(c, Loader=yaml.FullLoader)
-
-    with open(this.config.get('src_yaml'), 'r') as f:
-        yml = yaml.load(f, Loader=yaml.FullLoader)
-        logging.debug(json.dumps(yml, indent=2))
-
-    # Validate input file has required sections
-    try:
-        platform_name = yml.get('platform')
-        if platform_name:
-            platform = this.codes['platform'][yml['platform']]
-            logging.debug("Platform - " + yml['platform'] + ": " + platform)
-        else:
-            logging.error("Input YAML file must specify 'platform: <value>'")
-        ptversion = yml.get(PEOPLETOOLS)
-        if ptversion:
-            logging.debug("Download patches for PeopleTools " + ptversion)
-        else:
-            logging.error("Input YAML file must specify 'peopletools: <value>'")
-    except:
-        exit(2)
+    yml, ptversion, platform = __validate_input()
 
     # Get MOS Session for downloads
     session = get_mos_authentication()
@@ -332,6 +385,40 @@ def download_patches():
         get_jdk_patches(session, yml, JDK, platform, release)
     else:
         logging.info("No JDK Patches")
+
+def create_zip_file(archive_dir):
+    timing_key = "create zip file"
+    start_timing(timing_key)
+
+    yml, ptversion, platform = __validate_input()
+    regex = r"(\d{1})\.?(\d{2})"
+    pattern = "\\1.\\2"
+    ptversion = re.sub(regex, pattern, ptversion)
+
+    platform = yml['platform']
+
+    if platform == 'linux':
+        platform_short = 'LNX'
+    elif platform == 'windows':
+        platform_short = 'WIN'
+    now = datetime.datetime.now()
+    date = now.strftime("%y%m%d")
+
+    zipno = '1'
+    zipname = 'PT-INFRA-DPK-' + platform_short + '-' + ptversion + '-' + date + '_' + zipno + 'of2.zip'
+    logging.debug("Infra-DPK zip file name: " + zipname)
+    zipfolders = [JDK_PATCHES, TUXEDO_PATCHES, WEBLOGIC_PATCHES, WEBLOGIC_OPATCH_PATCHES]
+    __zipdirectory(zipname, zipfolders)
+    logging.info("Created " + zipname)
+
+    zipno = '2'
+    zipname = 'PT-INFRA-DPK-' + platform_short + '-' + ptversion + '-' + date + '_' + zipno + 'of2.zip'
+    logging.debug("Infra-DPK zip file name: " + zipname)
+    zipfolders = [ORACLECLIENT_PATCHES, ORACLECLIENT_OPATCH_PATCHES]
+    __zipdirectory(zipname, zipfolders)
+    logging.info("Created " + zipname)
+    
+    end_timing(timing_key)
 
 def get_weblogic_patches(session, yml, section, platform, release):
     timing_key = "weblogic patches"
@@ -524,13 +611,13 @@ def get_mos_authentication():
 
         # Validate login was success
         if r.ok:
-            logging.info("MOS Login was Successful")
+            logging.info(" - MOS Login was Successful")
         else:
-            logging.error("MOS login was NOT successful.")
+            logging.error(" - MOS login was NOT successful.")
             error_timings(timing_key)
             exit(2)
     except:
-        logging.error("Issue getting MOS auth token")
+        logging.error(" - Issue getting MOS auth token")
         end_timing(timing_key)
         exit(4)
 
@@ -548,7 +635,7 @@ def get_patch(session, patch, platform, release, product):
 
     if file_name:
         if product == JDK_PATCHES:
-            logging.info("Converting JDK to DPK Format")
+            logging.info(" - Converting JDK to DPK format")
             file_name = __convert_jdk_archive(file_name, release)
             logging.debug("JDK Files: " + file_name + " and Release: " + release)
         file = __copy_files(file_name, product, patch)
@@ -556,8 +643,8 @@ def get_patch(session, patch, platform, release, product):
     return file
 
 def __find_mos_patch(session, patch, platform, release):
-    timing_key = "__find_mos_patch"
-    start_timing(timing_key)
+    # timing_key = "__find_mos_patch"
+    # start_timing(timing_key)
 
     logging.debug(" - Downloading files from MOS")
     try:
@@ -572,11 +659,11 @@ def __find_mos_patch(session, patch, platform, release):
             logging.debug("Search results return success")
         else:
             logging.error("Search results did NOT return success")
-            error_timings(timing_key)
+            # error_timings(timing_key)
             exit(3)
     except:
         logging.error("Issue getting MOS search results")
-        end_timing(timing_key)
+        # end_timing(timing_key)
         raise
 
     try:
@@ -603,11 +690,11 @@ def __find_mos_patch(session, patch, platform, release):
             logging.debug(" - URL: " + str(download_links))
         else:
             logging.error("No download links found")
-            error_timings(timing_key)
+            # error_timings(timing_key)
             exit(2)
     except:
         logging.error("Issue creating download links file")
-        end_timing(timing_key)
+        # end_timing(timing_key)
         raise
 
     # multi thread download
@@ -615,7 +702,7 @@ def __find_mos_patch(session, patch, platform, release):
     results = __download_file(download_links)
     logging.debug("Download Results: " + str(results))
 
-    end_timing(timing_key)
+    # end_timing(timing_key)
     return results
 
 def __copy_files(file, product, patch):
@@ -663,6 +750,35 @@ def __download_file(urls):
     return file_name
 
 # File Management Functions
+def __validate_input():
+
+    with open(os.path.join(os.getcwd(), 'codes', 'codes.yaml')) as c:
+        this.codes = yaml.load(c, Loader=yaml.FullLoader)
+
+    with open(this.config.get('src_yaml'), 'r') as f:
+        yml = yaml.load(f, Loader=yaml.FullLoader)
+        logging.debug(json.dumps(yml, indent=2))
+
+    # Validate input file has required sections
+    try:
+        platform_name = yml.get('platform')
+        this.config['platform'] = platform_name
+        if platform_name:
+            platform = this.codes['platform'][yml['platform']]
+            logging.debug("Platform - " + yml['platform'] + ": " + platform)
+        else:
+            logging.error("Input YAML file must specify 'platform: <value>'")
+        ptversion = yml.get(PEOPLETOOLS)
+        this.config['ptversion'] = ptversion
+        if ptversion:
+            logging.debug("Download patches for PeopleTools " + ptversion)
+        else:
+            logging.error("Input YAML file must specify 'peopletools: <value>'")
+    except:
+        exit(2)
+
+    return yml, ptversion, platform
+
 def __get_patch_status(patch):
     # Checking Patch download status
     if not this.config.get('redownload'):
@@ -736,7 +852,7 @@ def __convert_jdk_archive(file, release):
 
     # Extract the .zip
     logging.debug("  - JDK - unzipping download")
-    with ZipFile(zip_file) as zipf:
+    with zipfile.ZipFile(zip_file) as zipf:
         zipf.extractall(this.config[TEMP])
 
     # Extract the .tar.gz file - it contains an extra top directory that breaks with the DPK
@@ -764,13 +880,30 @@ def __convert_jdk_archive(file, release):
     logging.debug("DPK Compatible JDK Archive: " + os.path.basename(file))
     return os.path.basename(file)
 
-def __tardirectory(path,name):
+def __tardirectory(path, name):
     with tarfile.open(name, "w:gz") as tarhandle:
         for root, dirs, files in os.walk(path):
             for f in files:
                 tarhandle.add(os.path.join(root, f))
 
         return name
+
+def __zipdirectory(filename, folders):
+    with zipfile.ZipFile(os.path.join(this.config.get(OUTPUT), filename),'a') as zip:
+    
+        original_dir = os.getcwd()
+        os.chdir(this.config.get(OUTPUT))
+        for folder in folders:
+            path = os.path.join(os.path.basename(this.config.get(ARCHIVE)), folder)
+            logging.debug("Zip path: " + path)
+            logging.debug("Zip file: " + str(zip))
+            for dirname, subdirs, files in os.walk(path):
+                zip.write(dirname)
+                for filename in files:
+                    zip.write(os.path.join(dirname, filename))
+            
+
+    os.chdir(original_dir)
 
 # Logging and Timings
 def setup_logging():
