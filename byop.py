@@ -12,11 +12,6 @@ import shutil
 import requests
 import tarfile
 import zipfile
-# from pathlib import Path
-# from http.cookiejar import MozillaCookieJar
-# from multiprocessing.pool import ThreadPool
-# from concurrent.futures import ThreadPoolExecutor
-# from concurrent.futures import as_completed
 from requests.auth import HTTPBasicAuth
 
 # Config Object
@@ -348,7 +343,7 @@ def download_patches():
     yml, ptversion, platform = __validate_input()
 
     # Get MOS Session for downloads
-    session = get_mos_authentication()
+    session = __get_mos_authentication()
 
     # Download patches
     if yml.get(WEBLOGIC):
@@ -431,7 +426,7 @@ def get_weblogic_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Weblogic")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        file_name = get_patch(session, patch, platform, release, WEBLOGIC_PATCHES)
+        file_name = __get_patch(session, patch, platform, release, WEBLOGIC_PATCHES)
         if file_name:
             downloaded = True
             weblogic_patches_version["patch" + str(i)] = str(patch)
@@ -457,7 +452,7 @@ def get_weblogic_opatch_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Weblogic OPatch Patches")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        file_name = get_patch(session, patch, platform, release, section)
+        file_name = __get_patch(session, patch, platform, release, section)
         if file_name:
             downloaded = True
             patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + WEBLOGIC_OPATCH_PATCHES + '/' + file_name
@@ -480,7 +475,7 @@ def get_tuxedo_patches(session, yml, section, platform, release):
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
         patch,version=patch.split(':', 1)
-        file_name = get_patch(session, patch, platform, release, TUXEDO_PATCHES)
+        file_name = __get_patch(session, patch, platform, release, TUXEDO_PATCHES)
         if file_name:
             downloaded = True
             tuxedo_patches_version["patch" + str(i)] = str(version)
@@ -507,7 +502,7 @@ def get_oracleclient_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Oracle Client")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        file_name = get_patch(session, patch, platform, release, ORACLECLIENT_PATCHES)
+        file_name = __get_patch(session, patch, platform, release, ORACLECLIENT_PATCHES)
         if file_name:
             downloaded = True
             oracleclient_patches_version["patch" + str(i)] = str(patch)
@@ -533,7 +528,7 @@ def get_oracleclient_opatch_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Oracle Client OPatch Patches")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        file_name = get_patch(session, patch, platform, release, section)
+        file_name = __get_patch(session, patch, platform, release, section)
         if file_name:
             downloaded = True
             patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + ORACLECLIENT_OPATCH_PATCHES + '/' + file_name
@@ -556,7 +551,7 @@ def get_jdk_patches(session, yml, section, platform, release):
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
         patch,version=patch.split(':', 1)
-        file_name = get_patch(session, patch, platform, release, JDK_PATCHES)
+        file_name = __get_patch(session, patch, platform, release, JDK_PATCHES)
         if file_name:
             downloaded = True
             jdk_patches_version["patch" + str(i)] = str(version)
@@ -574,9 +569,9 @@ def get_jdk_patches(session, yml, section, platform, release):
     end_timing(timing_key)
 
 # MOS Functions
-def get_mos_authentication():
+def __get_mos_authentication():
     # Copied from ioco - thanks Kyle!
-    timing_key = "get_mos_authentication"
+    timing_key = "__get_mos_authentication"
     start_timing(timing_key)
     
     logging.info("Authenticating with MOS")
@@ -625,7 +620,7 @@ def get_mos_authentication():
     end_timing(timing_key)
     return s
 
-def get_patch(session, patch, platform, release, product):
+def __get_patch(session, patch, platform, release, product):
     # Copied from ioco - thanks Kyle!
     if not __get_patch_status(patch):
         file_name = __find_mos_patch(session, patch, platform, release)
@@ -717,13 +712,13 @@ def __copy_files(file, product, patch):
         shutil.move(tmp_file, target_dir)
         logging.debug("    - [DONE] " + file)
     except FileNotFoundError: 
-        logging.error("Patch file file not found")
+        logging.error(" - Patch file " + file + " not found")
     except PermissionError: 
-        logging.error("You do not have permssion to copy to " + target_dir)
+        logging.error(" - You do not have permssion to copy to " + target_dir)
     except NotADirectoryError:
-        logging.error("The target directory is incorrect: " + target_dir)
+        logging.error(" - The target directory is incorrect: " + target_dir)
     except:
-        logging.error("Encountered an error moving the patch to the cpu_archives/ " + str(product) + " folder")
+        logging.error(" - Encountered an error moving the patch to the cpu_archives/ " + str(product) + " folder")
 
     __update_patch_status(patch, True)
     logging.debug("Update Patch Status - " + str(patch) + ": true")

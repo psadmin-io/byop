@@ -23,6 +23,27 @@ Mos password:
 [INFO ]  Configuration save to config.json
 
 byop build
+
+[INFO ]  Authenticating with MOS
+[INFO ]   - MOS Login was Successful
+[INFO ]  Downloading 5 patches for Weblogic
+[INFO ]  Downloading 1 patches for Weblogic OPatch Patches
+[INFO ]  Downloading 1 patches for Tuxedo
+[INFO ]  Downloading 1 patches for Oracle Client
+[INFO ]  Downloading 1 patches for Oracle Client OPatch Patches
+[INFO ]  Downloading 1 patches for JDK
+[INFO ]   - Converting JDK to DPK format
+---------------------------------------
+get_mos_authentication       : 00:00:04
+weblogic patches             : 00:00:14
+weblogic opatch patches      : 00:00:05
+tuxedo patches               : 00:00:02
+oracleclient patches         : 00:01:04
+oracleclient opatch patches  : 00:00:07
+jdk patches                  : 00:00:40
+---------------------------------------
+TOTAL TIME                   : 00:02:16
+---------------------------------------
 ```
 
 `byop` will take an input YAML file (`byop.yaml` is the default) and will download the patches listed in the file, and create a `psft_patches.yaml` file.
@@ -33,21 +54,20 @@ You can use different YAML file names if you want to version each release.
 byop build --src-yaml 22q4.yaml --tgt-yaml psft_patces_22q4.yaml
 ```
 
-There is a debug output mode that is enabled with the `--verbose` flag.
-
-
-
-
+There is a debug output mode that is enabled with the `--verbose` flag. You can use the `--quiet` flag to not print the timing output.
 
 # Setting up for development
 ```
-pip install virtualenv 
+python -m pip install virtualenv --user
 
 cd byop
-virtualenv -p python3 venv
+python -m virtualenv -p python3 venv
+## Linux/macOS
 . venv/bin/activate
+## Windows
+. venv/scripts/activate
 
-pip install --editable .
+python -m pip install --editable .
 ```
 
 # MOS Simple Search
