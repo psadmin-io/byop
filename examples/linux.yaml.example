@@ -1,0 +1,32 @@
+# 
+# This sample file is for Linux and the 2022 Q4 CPU patches
+#
+
+
+peopletools: '859'
+platform: 'linux'
+weblogic:
+  - '34686388'
+  - '32720458'
+  - '34545599'
+  - '34546901'
+  - '33670218'
+weblogic_opatch:
+  - '28186730'
+tuxedo:
+# tuxedo requires a release version for patches 
+# - 'patchid:xxx'
+  - '34237937:095'
+oracleclient:
+  - '34133642'
+oracleclient_opatch:
+  - '6880880'
+jdk:
+# jdk requires a release version for patches
+# - 'patchid:x.x.x'
+  - '34568985:11.0.17'
+cpu_release:
+  weblogic_version: 'Oct2022 CPU'
+  oracleclient_version: 'Jul2022 CPU'
+  tuxedo_version: 'RP095'
+  jdk_version: 'Oct2022 CPU'

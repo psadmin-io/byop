@@ -230,7 +230,7 @@ def cleanup(config, tmp, only_tmp, yaml, tgt_yaml, zip, zip_dir, only_zip, verbo
 # build #
 # ##### #
 @cli.command()
-@click.option('--src-yaml', 
+@click.option('-s', '--src-yaml', 
               default="byop.yaml", 
               show_default=True,
               help="Input YAML with IDPK Patches")
@@ -834,46 +834,58 @@ def __write_to_yaml(dict, header):
 
 def __convert_jdk_archive(file, release):
 
-    # simple_release = release.replace('.', '')
-    zip_file = os.path.join(this.config[TEMP], file)
+    zip_file = os.path.join(this.config.get(TEMP), file)
     logging.debug("Zip file: " + str(zip_file))
-    tarfile_orig =  os.path.join(this.config.get(TEMP), 'jdk-' + release + '_linux-x64_bin.tar.gz')
-    logging.debug("Delivered Tarball: " + str(tarfile_orig))
+    
+    if this.config.get('platform') == 'linux':
+        tarfile_orig =  os.path.join(this.config.get(TEMP), 'jdk-' + release + '_linux-x64_bin.tar.gz')
+        logging.debug("Delivered Tarball: " + str(tarfile_orig))
+    elif this.config.get('platform') == 'windows':
+        tarfile_orig =  os.path.join(this.config.get(TEMP), 'jdk-' + release + '_windows-x64_bin.zip')
+        logging.debug("Delivered Tarball: " + str(tarfile_orig))
+
+
     tarfile_pt = os.path.join(this.config.get(TEMP), 'pt-jdk-' + release + '.tgz')
     tarfile_dir = os.path.join(this.config.get(TEMP), 'tar')
     try:
         os.makedirs(tarfile_dir, exist_ok = True)
     except OSError as error:
         logging.error("Directory '%s' can not be created" % tarfile_dir)
-
+    
     # Extract the .zip
     logging.debug("  - JDK - unzipping download")
     with zipfile.ZipFile(zip_file) as zipf:
         zipf.extractall(this.config[TEMP])
 
-    # Extract the .tar.gz file - it contains an extra top directory that breaks with the DPK
-    if (os.path.exists(tarfile_orig)):
-
-        logging.debug("Cleanup tmp/tar directory before re-extracting JDK tarball")
-        # JDK tar permissions cause errors when cleanup is run - change them before?
-        files = glob.glob(config.get(TEMP) + "/tar/*", recursive=True)
-        if files:
-            for f in files:
-                try:
-                    shutil.rmtree(f)
-                    logging.debug("Removed file: " + str(f))
-                except OSError as e:
-                    logging.error("Error: %s : %s" % (f, e.strerror))
-        logging.debug("  - JDK - untarring .tar.gz file to remove parent directory")
-        tar1 = tarfile.open(tarfile_orig)
-        tar1.extractall(path=tarfile_dir) #, set_attrs=False)
-        tar1.close
-        # file = __remove_top_level_folder(tarfile_orig, tarfile_dir, tarfile_pt)
-    else:
-        logging.error("No tarball matching filename found: " + tarfile_orig)
+    if this.config.get('platform') == 'linux':
+        # Extract the .tar.gz file - it contains an extra top directory that breaks with the DPK
+        if (os.path.exists(tarfile_orig)):
+            logging.debug("Cleanup tmp/tar directory before re-extracting JDK tarball")
+            # JDK tar permissions cause errors when cleanup is run - change them before?
+            files = glob.glob(config.get(TEMP) + "/tar/*", recursive=True)
+            if files:
+                for f in files:
+                    try:
+                        shutil.rmtree(f)
+                        logging.debug("Removed file: " + str(f))
+                    except OSError as e:
+                        logging.error("Error: %s : %s" % (f, e.strerror))
+            logging.debug("  - JDK - untarring .tar.gz file to remove parent directory")
+            tar1 = tarfile.open(tarfile_orig)
+            tar1.extractall(path=tarfile_dir) #, set_attrs=False)
+            tar1.close
+            # file = __remove_top_level_folder(tarfile_orig, tarfile_dir, tarfile_pt)
+        else:
+            logging.error("No tarball matching filename found: " + tarfile_orig)
+    elif this.config.get('platform') == 'windows':
+        # Extract the .zip
+        logging.debug("  - JDK - unzipping download")
+        with zipfile.ZipFile(tarfile_orig) as zipf:
+            zipf.extractall(tarfile_dir)
 
     # Repackage the tarball and rename for the DPK
     logging.debug("  - JDK - creating DPK compatible .tgz")
+    logging.debug("  - Source: " + str(tarfile_dir))
     file = __tardirectory(tarfile_dir, tarfile_pt)
     logging.debug("DPK Compatible JDK Archive: " + os.path.basename(file))
 
