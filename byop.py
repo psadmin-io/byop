@@ -479,7 +479,7 @@ def get_tuxedo_patches(session, yml, section, platform, release):
         if file_name:
             downloaded = True
             tuxedo_patches_version["patch" + str(i)] = str(version)
-            tuxedo_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + TUXEDO_PATCHES_VERSION + '/' + file_name
+            tuxedo_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + TUXEDO_PATCHES + '/' + file_name
 
     if downloaded:
         logging.debug(TUXEDO_PATCHES_VERSION + ": ")
@@ -555,7 +555,7 @@ def get_jdk_patches(session, yml, section, platform, release):
         if file_name:
             downloaded = True
             jdk_patches_version["patch" + str(i)] = str(version)
-            jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES_VERSION + '/' + file_name
+            jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES + '/' + file_name
 
     if downloaded:
         logging.debug(JDK_PATCHES_VERSION + ": ")

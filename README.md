@@ -56,6 +56,78 @@ byop build --src-yaml 22q4.yaml --tgt-yaml psft_patces_22q4.yaml
 
 There is a debug output mode that is enabled with the `--verbose` flag. You can use the `--quiet` flag to not print the timing output.
 
+## Status 
+
+`byop` tracks with patches were downloaded so you can save bandwith and time by not redownloading files. In the `tmp` folder, the patch status is tracked in the JSON file `patch_status_file`. You can reset a patch to `false` and `byop` will download the patch again. If you want to redownload all the patches and ignore the status, you can pass the `--redownload` flag.
+
+```bash
+byop build --help
+Usage: byop build [OPTIONS]
+
+  Download and create an Infra-DPK package
+
+Options:
+  -s, --src-yaml TEXT  Input YAML with IDPK Patches  [default: byop.yaml]
+  -t, --tgt-yaml TEXT  Output YAML to use with DPK  [default:
+                       psft_patches.yaml]
+  --redownload         Ignore patch status - force all patches to be
+                       redownloaded.
+  --quiet              Don't print timing output
+  --verbose            Enable debug logging
+  --help               Show this message and exit.
+```
+
+## Cleanup
+
+When are you done building your Infra-DPK bundle, or if you want to start over, you can run the `cleanup` command to remove patches and temporary files.
+
+```bash
+byop cleanup --help
+Usage: byop cleanup [OPTIONS]
+
+  Remove files from the tmp and cpu_archives directories and remove PT-INFRA
+  zip files.
+
+Options:
+  --tmp            Delete tmp files
+  --only-tmp       Only delete tmp files
+  --yaml           Include psft_patches.yaml in cleanup
+  --tgt-yaml TEXT  Target YAML file to delete. Default is psft_patches.yaml.
+  --zip            Include PT-INFRA*.zip in cleanup
+  --zip-dir TEXT   Output directory for PT-INFRA zip file
+  --only-zip       Only delete PT-INFRA zip file
+  --quiet          Don't print timing output
+  --verbose        Enable debug logging
+  --help           Show this message and exit.
+```
+
+## Create Infra-DPK Zip File
+
+
+
+```bash
+byop zip --help
+Usage: byop zip [OPTIONS]
+
+  Package Infra-DPK files into a .zip file
+
+Options:
+  --src-yaml TEXT  Input YAML with IDPK Patches  [default: byop.yaml]
+  --zip-dir TEXT   Output directory for PT-INFRA zip file
+  --quiet          Don't print timing output
+  --verbose        Enable debug logging
+  --help           Show this message and exit.
+```
+
+
+## Debugging
+
+
+
+### MOS Simple Search
+
+To troubleshoot download issues, start with the MOS Simple Search page to see if the patch is available: https://updates.oracle.com/Orion/SimpleSearch/process_form
+
 # Setting up for development
 ```
 python -m pip install virtualenv --user
@@ -70,7 +142,5 @@ python -m virtualenv -p python3 venv
 python -m pip install --editable .
 ```
 
-# MOS Simple Search
 
-To troubleshoot download issues, start with the MOS Simple Search page to see if the patch is available: https://updates.oracle.com/Orion/SimpleSearch/process_form
 
