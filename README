@@ -1,7 +1,0 @@
-# Bring Your Own Patches - IDPK Builder
-
-## Installation
-
-```bash
-pip install docopt==0.6.2
-```

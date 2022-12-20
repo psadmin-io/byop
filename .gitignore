@@ -1,3 +1,15 @@
-byop.yaml
-psft_patches.yaml
-logs/*
+*.yaml
+*.json
+*.log
+!codes/codes.yaml
+tmp/*
+cpu_archives/*
+zip/*
+yaml/*
+output/*
+
+# Python files
+*.egg-info/*
+venv/*
+dist/*
+__pycache__/*

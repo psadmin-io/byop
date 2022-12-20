@@ -1,0 +1,18 @@
+platform:
+  linux: '226P'
+  windows: '233P'
+peopletools: 
+  '860':
+    weblogic: '14.1.1.0.0'
+    weblogic_opatch: '13.9.4.2.1.0'
+    oracleclient: '19.0.0.0.0'
+    oracleclient_opatch: '12.2.0.1.0'
+    jdk: '11.0.17'
+    tuxedo: '12.2.2.0.0'
+  '859':
+    weblogic: '14.1.1.0.0'
+    weblogic_opatch: '13.9.4.2.1.0'
+    oracleclient: '19.0.0.0.0'
+    oracleclient_opatch: '12.2.0.1.0'
+    jdk: '11.0.17'
+    tuxedo: '12.2.2.0.0'
