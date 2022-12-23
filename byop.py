@@ -138,7 +138,6 @@ def config(config, mos_username, mos_password):
     config["mos_password"] = encoded
     config.save()
     logging.info("Configuration save to config.json")
-    __create_patch_status()
 
 # ####### #
 # cleanup #
@@ -345,6 +344,8 @@ def build_directories():
         os.makedirs(os.path.join(this.config[TEMP]), exist_ok = True)
     except OSError as error:
         logging.error("Directory '%s' can not be created" % os.path.join(this.config[TEMP]))
+    
+    __create_patch_status()
 
 def download_patches():
     yml, ptversion, platform = __validate_input()
