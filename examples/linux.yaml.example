@@ -17,10 +17,10 @@ tuxedo:
 # tuxedo requires a release version for patches 
 # - 'patchid:xxx'
   - '34237937:095'
-oracleclient:
-  - '34133642'
-oracleclient_opatch:
-  - '6880880'
+# oracleclient:
+#   - '34133642'
+# oracleclient_opatch:
+#   - '6880880'
 jdk:
 # jdk requires a release version for patches
 # - 'patchid:x.x.x'
