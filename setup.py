@@ -25,7 +25,7 @@ setup_args = dict(
     keywords=['PeopleSoft', 'PeopleTools', 'CPU', 'Security Patches', 'Infrastructure DPK', 'IDPK'],
     include_package_data=True,
     py_modules=['byop'],
-    install_requires=["py","click","requests","pyyaml"],
+    install_requires=["py","click","requests","pyyaml","cryptocode"],
     entry_points={
         "console_scripts": [
             "byop=byop:cli",

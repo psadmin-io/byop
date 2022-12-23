@@ -12,6 +12,7 @@ import shutil
 import requests
 import tarfile
 import zipfile
+import cryptocode
 from requests.auth import HTTPBasicAuth
 
 # Config Object
@@ -132,10 +133,12 @@ def config(config, mos_username, mos_password):
     """Build the config.json"""
     setup_logging()
 
+    encoded = cryptocode.encrypt(mos_password,"NIswEgoOj39wpzJcqocQ8mw4iMkqtS")
     config["mos_username"] = mos_username
-    config["mos_password"] = mos_password
+    config["mos_password"] = encoded
     config.save()
     logging.info("Configuration save to config.json")
+    __create_patch_status()
 
 # ####### #
 # cleanup #
@@ -259,6 +262,10 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     logging.debug("Source YAML: " + this.config['tgt_yaml'])
     logging.debug("Target YAML: " + this.config['tgt_yaml'])
     logging.debug(this.config['mos_username'])
+
+    if not os.path.exists(src_yaml):
+        logging.info("Source YAML File not found: " + src_yaml)
+        exit(2)
 
     init_timings()
     build_directories()
@@ -479,7 +486,7 @@ def get_tuxedo_patches(session, yml, section, platform, release):
         if file_name:
             downloaded = True
             tuxedo_patches_version["patch" + str(i)] = str(version)
-            tuxedo_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + TUXEDO_PATCHES_VERSION + '/' + file_name
+            tuxedo_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + TUXEDO_PATCHES + '/' + file_name
 
     if downloaded:
         logging.debug(TUXEDO_PATCHES_VERSION + ": ")
@@ -555,7 +562,7 @@ def get_jdk_patches(session, yml, section, platform, release):
         if file_name:
             downloaded = True
             jdk_patches_version["patch" + str(i)] = str(version)
-            jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES_VERSION + '/' + file_name
+            jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES + '/' + file_name
 
     if downloaded:
         logging.debug(JDK_PATCHES_VERSION + ": ")
@@ -600,7 +607,8 @@ def __get_mos_authentication():
         logging.debug('Sending Basic Auth to login, using new session')
         s = requests.session()
         logging.debug("Using MOS username: " + this.config.get('mos_username'))
-        r = s.post(login_url, auth = HTTPBasicAuth(this.config.get('mos_username'), this.config.get('mos_password')))
+        decoded = cryptocode.decrypt(this.config.get('mos_password'), "NIswEgoOj39wpzJcqocQ8mw4iMkqtS")
+        r = s.post(login_url, auth = HTTPBasicAuth(this.config.get('mos_username'), decoded))
             
         # Save session cookies to be used by downloader later on...
         this.config['mos_cookies'] = s.cookies
@@ -775,21 +783,25 @@ def __validate_input():
 
     return yml, ptversion, platform
 
+def __create_patch_status():
+    if not os.path.exists(this.config.get(STATUS)):
+        logging.debug("Patch Status File missing - creating it now")
+        try:
+            with open(this.config.get(STATUS),'w') as f:
+                patch_status = {}
+                json.dump(patch_status, f)
+        except FileNotFoundError:
+            logging.error("Patch status file not created. Try again with `byop config`")
+            exit(2)
+        except:
+            logging.error("Issue creating Patch status file")
+            raise
+
 def __get_patch_status(patch):
     # Checking Patch download status
     if not this.config.get('redownload'):
         if not os.path.exists(this.config.get(STATUS)):
-            logging.debug("Patch Status File missing - creating it now")
-            try:
-                with open(this.config.get(STATUS),'w') as f:
-                    patch_status = {}
-                    json.dump(patch_status, f)
-            except FileNotFoundError:
-                logging.error("Patch files directory not created. Try again with `byop directories`")
-                exit(2)
-            except:
-                logging.error("Issue creating Patch status file")
-                raise
+            __create_patch_status()
         else:
             try:
                 with open(this.config.get(STATUS)) as f:
