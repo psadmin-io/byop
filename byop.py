@@ -802,12 +802,11 @@ def __get_patch_status(patch):
     if not this.config.get('redownload'):
         if not os.path.exists(this.config.get(STATUS)):
             __create_patch_status()
-        else:
-            try:
-                with open(this.config.get(STATUS)) as f:
-                    patch_status = json.load(f)
-            except:
-                logging.error("Issue opening Patch status file")
+        try:
+            with open(this.config.get(STATUS)) as f:
+                patch_status = json.load(f)
+        except:
+            logging.error("Issue opening Patch status file")
 
         logging.debug("Patch status: \n" + json.dumps(patch_status))
         try:
