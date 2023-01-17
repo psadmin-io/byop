@@ -138,7 +138,6 @@ def config(config, mos_username, mos_password):
     config["mos_password"] = encoded
     config.save()
     logging.info("Configuration save to config.json")
-    __create_patch_status()
 
 # ####### #
 # cleanup #
@@ -345,6 +344,8 @@ def build_directories():
         os.makedirs(os.path.join(this.config[TEMP]), exist_ok = True)
     except OSError as error:
         logging.error("Directory '%s' can not be created" % os.path.join(this.config[TEMP]))
+    
+    __create_patch_status()
 
 def download_patches():
     yml, ptversion, platform = __validate_input()
@@ -679,14 +680,18 @@ def __find_mos_patch(session, patch, platform, release):
             pattern = "https.+?Download\/process_form\/.*\.zip.*"
         logging.debug("Search Pattern: " + pattern)
         download_links = re.findall(pattern,search_results)
-        download_links_file = os.path.join(this.config[TEMP], 'mos-download.links')
-        # Write download links to file
-        f = open(download_links_file,"w")
-        for link in download_links:
-            # Write download links list to file
-            logging.debug(link)
-            f.write(link + os.linesep)
-        f.close()
+        if download_links:
+            download_links_file = os.path.join(this.config[TEMP], 'mos-download.links')
+            # Write download links to file
+            f = open(download_links_file,"w")
+            for link in download_links:
+                # Write download links list to file
+                logging.debug(link)
+                f.write(link + os.linesep)
+            f.close()
+        else:
+            # Check for superseced patch
+            pattern = "https.+?Download\/process_form\/.*" + simple_release + ".*\.zip*"
 
         # Validate download links
         if len(download_links) > 0:
