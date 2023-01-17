@@ -680,14 +680,18 @@ def __find_mos_patch(session, patch, platform, release):
             pattern = "https.+?Download\/process_form\/.*\.zip.*"
         logging.debug("Search Pattern: " + pattern)
         download_links = re.findall(pattern,search_results)
-        download_links_file = os.path.join(this.config[TEMP], 'mos-download.links')
-        # Write download links to file
-        f = open(download_links_file,"w")
-        for link in download_links:
-            # Write download links list to file
-            logging.debug(link)
-            f.write(link + os.linesep)
-        f.close()
+        if download_links:
+            download_links_file = os.path.join(this.config[TEMP], 'mos-download.links')
+            # Write download links to file
+            f = open(download_links_file,"w")
+            for link in download_links:
+                # Write download links list to file
+                logging.debug(link)
+                f.write(link + os.linesep)
+            f.close()
+        else:
+            # Check for superseced patch
+            pattern = "https.+?Download\/process_form\/.*" + simple_release + ".*\.zip*"
 
         # Validate download links
         if len(download_links) > 0:
