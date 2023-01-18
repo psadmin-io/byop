@@ -257,7 +257,7 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     if not config.get('download_threads'):
         this.config['download_threads'] = 2
     this.config['src_yaml'] = src_yaml
-    this.config['tgt_yaml'] = tgt_yaml
+    this.config['tgt_yaml'] = os.path.join(this.config[OUTPUT], tgt_yaml)
     logging.debug("Source YAML: " + this.config['tgt_yaml'])
     logging.debug("Target YAML: " + this.config['tgt_yaml'])
     logging.debug(this.config['mos_username'])
@@ -280,16 +280,21 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
               default="byop.yaml", 
               show_default=True,
               help="Input YAML with IDPK Patches")
+@click.option('-t', '--tgt-yaml', 
+              default="psft_patches.yaml", 
+              show_default=True, 
+              help="Output YAML to use with DPK")
 @click.option('--zip-dir',
               help="Output directory for PT-INFRA zip file" )
 @common_options
 @pass_config
-def zip(config, src_yaml, zip_dir, verbose, quiet):
+def zip(config, src_yaml, tgt_yaml, zip_dir, verbose, quiet):
     """Package Infra-DPK files into a .zip file"""
 
     this.config['verbose'] = verbose
     this.config['quiet'] = quiet
     this.config['src_yaml'] = src_yaml
+    this.config['tgt_yaml'] = os.path.join(this.config[OUTPUT], tgt_yaml)
     if zip_dir:
         archive_dir = zip_dir
     else:
@@ -297,7 +302,7 @@ def zip(config, src_yaml, zip_dir, verbose, quiet):
     setup_logging()
     init_timings()
 
-    create_zip_file(archive_dir)
+    create_zip_file(archive_dir, tgt_yaml)
 
     print_timings()
 
@@ -390,7 +395,7 @@ def download_patches():
     else:
         logging.info("No JDK Patches")
 
-def create_zip_file(archive_dir):
+def create_zip_file(archive_dir, tgt_yaml):
     timing_key = "create zip file"
     start_timing(timing_key)
 
@@ -414,6 +419,8 @@ def create_zip_file(archive_dir):
     zipfolders = [JDK_PATCHES, TUXEDO_PATCHES, WEBLOGIC_PATCHES, WEBLOGIC_OPATCH_PATCHES]
     __zipdirectory(zipname, zipfolders)
     logging.info("Created " + zipname)
+    logging.debug("Adding psft_patches.yaml to zip 1")
+    __zipyaml(zipname, tgt_yaml)
 
     zipno = '2'
     zipname = 'PT-INFRA-DPK-' + platform_short + '-' + ptversion + '-' + date + '_' + zipno + 'of2.zip'
@@ -460,7 +467,7 @@ def get_weblogic_opatch_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Weblogic OPatch Patches")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        file_name = __get_patch(session, patch, platform, release, section)
+        file_name = __get_patch(session, patch, platform, release, WEBLOGIC_OPATCH_PATCHES)
         if file_name:
             downloaded = True
             patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + WEBLOGIC_OPATCH_PATCHES + '/' + file_name
@@ -558,11 +565,12 @@ def get_jdk_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for JDK")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        patch,version=patch.split(':', 1)
-        file_name = __get_patch(session, patch, platform, release, JDK_PATCHES)
+        patch,version = patch.split(':', 1)
+        simple_verison = version.replace('.', '')
+        file_name = __get_patch(session, patch, platform, version, JDK_PATCHES)
         if file_name:
             downloaded = True
-            jdk_patches_version["patch" + str(i)] = str(version)
+            jdk_patches_version["patch" + str(i)] = str(simple_verison)
             jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES + '/' + file_name
 
     if downloaded:
@@ -677,7 +685,7 @@ def __find_mos_patch(session, patch, platform, release):
             simple_release = release.replace('.', '')
             pattern = "https.+?Download\/process_form\/.*" + simple_release + ".*\.zip*"
         else:
-            pattern = "https.+?Download\/process_form\/.*\.zip.*"
+            pattern = "https.+?Download\/process_form\/.*\.zip*"
         logging.debug("Search Pattern: " + pattern)
         download_links = re.findall(pattern,search_results)
         if download_links:
@@ -890,7 +898,6 @@ def __convert_jdk_archive(file, release):
             tar1 = tarfile.open(tarfile_orig)
             tar1.extractall(path=tarfile_dir) #, set_attrs=False)
             tar1.close
-            # file = __remove_top_level_folder(tarfile_orig, tarfile_dir, tarfile_pt)
         else:
             logging.error("No tarball matching filename found: " + tarfile_orig)
     elif this.config.get('platform') == 'windows':
@@ -936,9 +943,18 @@ def __zipdirectory(filename, folders):
                 zip.write(dirname)
                 for filename in files:
                     zip.write(os.path.join(dirname, filename))
-            
 
     os.chdir(original_dir)
+
+def __zipyaml(filename, file):
+    with zipfile.ZipFile(os.path.join(this.config.get(OUTPUT), filename),'a') as zip:
+        original_dir = os.getcwd()
+        os.chdir(this.config.get(OUTPUT))
+        logging.info("Adding psft_patches.yaml to zip")
+        zip.write(os.path.join(file))
+
+    os.chdir(original_dir)
+
 
 # Logging and Timings
 def setup_logging():
