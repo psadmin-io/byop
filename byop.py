@@ -557,11 +557,12 @@ def get_jdk_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for JDK")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        patch,version=patch.split(':', 1)
-        file_name = __get_patch(session, patch, platform, release, JDK_PATCHES)
+        patch,version = patch.split(':', 1)
+        simple_verison = version.replace('.', '')
+        file_name = __get_patch(session, patch, platform, version, JDK_PATCHES)
         if file_name:
             downloaded = True
-            jdk_patches_version["patch" + str(i)] = str(version)
+            jdk_patches_version["patch" + str(i)] = str(simple_verison)
             jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES + '/' + file_name
 
     if downloaded:
@@ -676,7 +677,7 @@ def __find_mos_patch(session, patch, platform, release):
             simple_release = release.replace('.', '')
             pattern = "https.+?Download\/process_form\/.*" + simple_release + ".*\.zip*"
         else:
-            pattern = "https.+?Download\/process_form\/.*\.zip.*"
+            pattern = "https.+?Download\/process_form\/.*\.zip*"
         logging.debug("Search Pattern: " + pattern)
         download_links = re.findall(pattern,search_results)
         download_links_file = os.path.join(this.config[TEMP], 'mos-download.links')
@@ -885,7 +886,6 @@ def __convert_jdk_archive(file, release):
             tar1 = tarfile.open(tarfile_orig)
             tar1.extractall(path=tarfile_dir) #, set_attrs=False)
             tar1.close
-            # file = __remove_top_level_folder(tarfile_orig, tarfile_dir, tarfile_pt)
         else:
             logging.error("No tarball matching filename found: " + tarfile_orig)
     elif this.config.get('platform') == 'windows':
