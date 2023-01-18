@@ -466,7 +466,7 @@ def get_weblogic_opatch_patches(session, yml, section, platform, release):
     logging.info("Downloading " + str(len(yml[section])) + " patches for Weblogic OPatch Patches")
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
-        file_name = __get_patch(session, patch, platform, release, section)
+        file_name = __get_patch(session, patch, platform, release, WEBLOGIC_OPATCH_PATCHES)
         if file_name:
             downloaded = True
             patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + WEBLOGIC_OPATCH_PATCHES + '/' + file_name
