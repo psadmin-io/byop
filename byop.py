@@ -258,7 +258,7 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     if not config.get('download_threads'):
         this.config['download_threads'] = 2
     this.config['src_yaml'] = src_yaml
-    this.config['tgt_yaml'] = tgt_yaml
+    this.config['tgt_yaml'] = os.path.join(this.config[OUTPUT], tgt_yaml)
     logging.debug("Source YAML: " + this.config['tgt_yaml'])
     logging.debug("Target YAML: " + this.config['tgt_yaml'])
     logging.debug(this.config['mos_username'])
@@ -281,16 +281,21 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
               default="byop.yaml", 
               show_default=True,
               help="Input YAML with IDPK Patches")
+@click.option('-t', '--tgt-yaml', 
+              default="psft_patches.yaml", 
+              show_default=True, 
+              help="Output YAML to use with DPK")
 @click.option('--zip-dir',
               help="Output directory for PT-INFRA zip file" )
 @common_options
 @pass_config
-def zip(config, src_yaml, zip_dir, verbose, quiet):
+def zip(config, src_yaml, tgt_yaml, zip_dir, verbose, quiet):
     """Package Infra-DPK files into a .zip file"""
 
     this.config['verbose'] = verbose
     this.config['quiet'] = quiet
     this.config['src_yaml'] = src_yaml
+    this.config['tgt_yaml'] = os.path.join(this.config[OUTPUT], tgt_yaml)
     if zip_dir:
         archive_dir = zip_dir
     else:
@@ -298,7 +303,7 @@ def zip(config, src_yaml, zip_dir, verbose, quiet):
     setup_logging()
     init_timings()
 
-    create_zip_file(archive_dir)
+    create_zip_file(archive_dir, tgt_yaml)
 
     print_timings()
 
@@ -389,7 +394,7 @@ def download_patches():
     else:
         logging.info("No JDK Patches")
 
-def create_zip_file(archive_dir):
+def create_zip_file(archive_dir, tgt_yaml):
     timing_key = "create zip file"
     start_timing(timing_key)
 
@@ -413,6 +418,8 @@ def create_zip_file(archive_dir):
     zipfolders = [JDK_PATCHES, TUXEDO_PATCHES, WEBLOGIC_PATCHES, WEBLOGIC_OPATCH_PATCHES]
     __zipdirectory(zipname, zipfolders)
     logging.info("Created " + zipname)
+    logging.debug("Adding psft_patches.yaml to zip 1")
+    __zipyaml(zipname, tgt_yaml)
 
     zipno = '2'
     zipname = 'PT-INFRA-DPK-' + platform_short + '-' + ptversion + '-' + date + '_' + zipno + 'of2.zip'
@@ -931,9 +938,18 @@ def __zipdirectory(filename, folders):
                 zip.write(dirname)
                 for filename in files:
                     zip.write(os.path.join(dirname, filename))
-            
 
     os.chdir(original_dir)
+
+def __zipyaml(filename, file):
+    with zipfile.ZipFile(os.path.join(this.config.get(OUTPUT), filename),'a') as zip:
+        original_dir = os.getcwd()
+        os.chdir(this.config.get(OUTPUT))
+        logging.info("Adding psft_patches.yaml to zip")
+        zip.write(os.path.join(file))
+
+    os.chdir(original_dir)
+
 
 # Logging and Timings
 def setup_logging():
