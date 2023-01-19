@@ -566,6 +566,7 @@ def get_jdk_patches(session, yml, section, platform, release):
     for i, patch in enumerate(yml[section], start=1):
         patch,version = patch.split(':', 1)
         # simple_verison = version.replace('.', '')
+        logging.debug("JDK Version: " + version)
         file_name = __get_patch(session, patch, platform, version, JDK_PATCHES)
         if file_name:
             downloaded = True
