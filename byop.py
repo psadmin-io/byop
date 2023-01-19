@@ -566,11 +566,11 @@ def get_jdk_patches(session, yml, section, platform, release):
     downloaded = False
     for i, patch in enumerate(yml[section], start=1):
         patch,version = patch.split(':', 1)
-        simple_verison = version.replace('.', '')
+        # simple_verison = version.replace('.', '')
         file_name = __get_patch(session, patch, platform, version, JDK_PATCHES)
         if file_name:
             downloaded = True
-            jdk_patches_version["patch" + str(i)] = str(simple_verison)
+            jdk_patches_version["patch" + str(i)] = str(version)
             jdk_patches["patch" + str(i)] = '%{hiera("peoplesoft_base")}/dpk/cpu_archives/' + JDK_PATCHES + '/' + file_name
 
     if downloaded:
