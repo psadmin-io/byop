@@ -403,6 +403,10 @@ def create_manifest():
     logging.info("Creating " + MANIFEST)
     yml, ptversion, platform = __validate_input()
     
+    regex = r"(\d{1})\.?(\d{2})"
+    pattern = "\\1.\\2"
+    ptversion = re.sub(regex, pattern, ptversion)
+
     if os.path.exists(this.config.get(MANIFEST)):
         with open(this.config.get(MANIFEST), 'r') as manifest:
             manifest = yaml.load(this.config.get("src_yaml"), Loader=yaml.FullLoader) or {}
@@ -410,7 +414,11 @@ def create_manifest():
         manifest = {}
 
     manifest = yml['manifest']
-    
+    manifest['type'] = 'tools-infra'
+    manifest['platform'] = yml['platform'].capitalize()
+    manifest['tools_version'] = ptversion
+    manifest['min_tools_version'] = ptversion
+
     with open(this.config.get(MANIFEST), 'w') as f:
         for key, value in manifest.items():
             f.write('%s=%s\n' % (key, value))
