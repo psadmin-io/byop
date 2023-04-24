@@ -7,6 +7,7 @@ cpu_archives/*
 zip/*
 yaml/*
 output/*
+build/*
 
 # Python files
 *.egg-info/*
