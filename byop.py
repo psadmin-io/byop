@@ -90,6 +90,7 @@ ARCHIVE = 'archive_dir'
 TEMP = 'tmp_dir'
 STATUS = 'patch_status_file'
 OUTPUT = 'zip_dir'
+MANIFEST = 'ptinfra-manifest'
 
 # ###### #
 # cli    #
@@ -115,6 +116,8 @@ def cli(config):
         this.config[TEMP] = os.path.join(os.getcwd(), 'tmp')
     if not config.get(STATUS):
         this.config[STATUS] = os.path.join(this.config[TEMP], STATUS)
+    if not config.get(MANIFEST):
+        this.config[MANIFEST] = os.path.join(config.get(OUTPUT), MANIFEST)
 
     pass
 
@@ -269,6 +272,8 @@ def build(config, src_yaml, tgt_yaml, redownload, verbose, quiet):
     init_timings()
     build_directories()
     download_patches()
+    create_manifest()
+    
     print_timings()
     pass
 
@@ -395,6 +400,30 @@ def download_patches():
     else:
         logging.info("No JDK Patches")
 
+def create_manifest():
+    logging.info("Creating " + MANIFEST)
+    yml, ptversion, platform = __validate_input()
+    
+    regex = r"(\d{1})\.?(\d{2})"
+    pattern = "\\1.\\2"
+    ptversion = re.sub(regex, pattern, ptversion)
+
+    if os.path.exists(this.config.get(MANIFEST)):
+        with open(this.config.get(MANIFEST), 'r') as manifest:
+            manifest = yaml.load(this.config.get("src_yaml"), Loader=yaml.FullLoader) or {}
+    else:
+        manifest = {}
+
+    manifest = yml['manifest']
+    manifest['type'] = 'tools-infra'
+    manifest['platform'] = yml['platform'].capitalize()
+    manifest['tools_version'] = ptversion
+    manifest['min_tools_version'] = ptversion
+
+    with open(this.config.get(MANIFEST), 'w') as f:
+        for key, value in manifest.items():
+            f.write('%s=%s\n' % (key, value))
+
 def create_zip_file(archive_dir, tgt_yaml):
     timing_key = "create zip file"
     start_timing(timing_key)
@@ -419,14 +448,18 @@ def create_zip_file(archive_dir, tgt_yaml):
     zipfolders = [JDK_PATCHES, TUXEDO_PATCHES, WEBLOGIC_PATCHES, WEBLOGIC_OPATCH_PATCHES]
     __zipdirectory(zipname, zipfolders)
     logging.info("Created " + zipname)
-    logging.debug("Adding psft_patches.yaml to zip 1")
+    logging.debug("Adding " + tgt_yaml + " to zip 1")
     __zipyaml(zipname, tgt_yaml)
+    logging.debug("Adding " + MANIFEST + " to zip 1")
+    __zipyaml(zipname, os.path.basename(this.config.get(MANIFEST)))
 
     zipno = '2'
     zipname = 'PT-INFRA-DPK-' + platform_short + '-' + ptversion + '-' + date + '_' + zipno + 'of2.zip'
     logging.debug("Infra-DPK zip file name: " + zipname)
     zipfolders = [ORACLECLIENT_PATCHES, ORACLECLIENT_OPATCH_PATCHES]
     __zipdirectory(zipname, zipfolders)
+    logging.debug("Adding " + MANIFEST + " to zip 2")
+    __zipyaml(zipname, os.path.basename(this.config.get(MANIFEST)))
     logging.info("Created " + zipname)
     
     end_timing(timing_key)
@@ -951,11 +984,10 @@ def __zipyaml(filename, file):
     with zipfile.ZipFile(os.path.join(this.config.get(OUTPUT), filename),'a') as zip:
         original_dir = os.getcwd()
         os.chdir(this.config.get(OUTPUT))
-        logging.info("Adding psft_patches.yaml to zip")
+        logging.info("Adding " + file + " to zip")
         zip.write(os.path.join(file))
 
     os.chdir(original_dir)
-
 
 # Logging and Timings
 def setup_logging():
